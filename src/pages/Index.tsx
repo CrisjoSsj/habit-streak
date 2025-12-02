@@ -1,12 +1,336 @@
-// Update this page (the content is just a fallback if you fail to update the page)
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Flame, Droplets, BookOpen, Brain, Trophy, Bell } from "lucide-react";
+import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
+import { useMemo, useState } from "react";
+
+const habits = [
+  {
+    id: "exercise",
+    name: "Ejercicio",
+    description: "30 min de actividad física",
+    icon: Flame,
+    target: "30 min",
+    category: "Movimiento",
+  },
+  {
+    id: "water",
+    name: "Agua",
+    description: "8 vasos de agua",
+    icon: Droplets,
+    target: "8 vasos",
+    category: "Hidratación",
+  },
+  {
+    id: "reading",
+    name: "Lectura",
+    description: "20 min de lectura",
+    icon: BookOpen,
+    target: "20 min",
+    category: "Crecimiento",
+  },
+  {
+    id: "meditation",
+    name: "Meditación",
+    description: "10 min de respiración consciente",
+    icon: Brain,
+    target: "10 min",
+    category: "Bienestar mental",
+  },
+];
+
+const weeklyData = [
+  { day: "L", completions: 3 },
+  { day: "M", completions: 4 },
+  { day: "X", completions: 2 },
+  { day: "J", completions: 4 },
+  { day: "V", completions: 3 },
+  { day: "S", completions: 5 },
+  { day: "D", completions: 4 },
+];
+
+const monthlyData = [
+  { week: "Semana 1", completions: 18 },
+  { week: "Semana 2", completions: 20 },
+  { week: "Semana 3", completions: 22 },
+  { week: "Semana 4", completions: 25 },
+];
+
+const achievements = [
+  {
+    id: 1,
+    title: "Racha de fuego",
+    description: "7 días seguidos cumpliendo tus hábitos.",
+  },
+  {
+    id: 2,
+    title: "Hidratación ejemplar",
+    description: "30 días cumpliendo tu objetivo de agua.",
+  },
+  {
+    id: 3,
+    title: "Lectura constante",
+    description: "15 días leyendo sin faltar.",
+  },
+];
 
 const Index = () => {
+  const [todayCompletion, setTodayCompletion] = useState<Record<string, boolean>>({});
+
+  const completedCount = useMemo(
+    () => habits.filter((h) => todayCompletion[h.id]).length,
+    [todayCompletion],
+  );
+
+  const completionPercent = useMemo(
+    () => (habits.length ? Math.round((completedCount / habits.length) * 100) : 0),
+    [completedCount],
+  );
+
+  const handleToggleHabit = (id: string) => {
+    setTodayCompletion((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background">
-      <div className="text-center">
-        <h1 className="mb-4 text-4xl font-bold">Welcome to Your Blank App</h1>
-        <p className="text-xl text-muted-foreground">Start building your amazing project here!</p>
-      </div>
+    <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/20">
+      <header className="border-b bg-background/80 backdrop-blur">
+        <div className="container flex items-center justify-between py-4">
+          <div className="flex items-baseline gap-2">
+            <span className="text-sm font-semibold tracking-wide text-primary">HABITTRACK</span>
+            <span className="text-xs text-muted-foreground">Seguimiento de hábitos saludables</span>
+          </div>
+          <nav className="flex items-center gap-3 text-sm">
+            <a href="/" className="text-foreground/80 hover:text-foreground">
+              Panel
+            </a>
+            <a href="/admin" className="text-muted-foreground hover:text-foreground">
+              Admin
+            </a>
+            <Button size="sm" variant="outline" className="ml-2">
+              Iniciar sesión
+            </Button>
+          </nav>
+        </div>
+      </header>
+
+      <main className="container py-8">
+        <section className="mb-8 grid gap-6 lg:grid-cols-[2fr,3fr]" aria-labelledby="hero-heading">
+          <div className="space-y-5">
+            <h1
+              id="hero-heading"
+              className="text-balance font-serif text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl"
+            >
+              Construye hábitos saludables que duren toda la vida.
+            </h1>
+            <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
+              Crea hábitos personalizados, registra tu cumplimiento diario, visualiza rachas y celebra tus logros con
+              un sistema de medallas motivador.
+            </p>
+            <div className="flex flex-wrap items-center gap-3">
+              <Button size="lg">Comenzar hoy</Button>
+              <Button size="lg" variant="outline" className="border-dashed">
+                Ver cómo funciona
+              </Button>
+              <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
+                <Flame className="h-4 w-4 text-primary" />
+                <span>Rachas, recordatorios y gráficos en tiempo real.</span>
+              </div>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardDescription>Hábitos de hoy</CardDescription>
+                  <CardTitle className="text-2xl">{completedCount + "/" + habits.length}</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Progress value={completionPercent} aria-label="Progreso de hábitos de hoy" />
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardDescription>Mejor racha</CardDescription>
+                  <CardTitle className="text-2xl">21 días</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">Sigue así para desbloquear nuevas medallas.</p>
+                </CardContent>
+              </Card>
+              <Card className="shadow-sm">
+                <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
+                  <div>
+                    <CardDescription>Recordatorios</CardDescription>
+                    <CardTitle className="text-2xl">3 activos</CardTitle>
+                  </div>
+                  <Bell className="h-5 w-5 text-primary" />
+                </CardHeader>
+                <CardContent>
+                  <p className="text-xs text-muted-foreground">Configura avisos diarios y horarios flexibles.</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          <Card className="shadow-md">
+            <CardHeader>
+              <CardTitle className="flex items-center justify-between text-base sm:text-lg">
+                Tus hábitos de hoy
+                <Badge variant="outline" className="text-[0.7rem] font-normal">
+                  Vista ejemplo
+                </Badge>
+              </CardTitle>
+              <CardDescription>Marca tus check-ins diarios y mantén vivas tus rachas.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <ul className="space-y-3">
+                {habits.map((habit) => {
+                  const Icon = habit.icon;
+                  const done = !!todayCompletion[habit.id];
+                  return (
+                    <li
+                      key={habit.id}
+                      className="flex items-center justify-between rounded-lg border bg-card/70 px-3 py-2.5 text-sm shadow-xs"
+                    >
+                      <div className="flex min-w-0 items-center gap-3">
+                        <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground">
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{habit.name}</p>
+                          <p className="truncate text-xs text-muted-foreground">{habit.description}</p>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <span className="text-[0.7rem] text-muted-foreground">Meta: {habit.target}</span>
+                        <Button
+                          size="sm"
+                          variant={done ? "default" : "outline"}
+                          className="h-8 px-3 text-xs"
+                          onClick={() => handleToggleHabit(habit.id)}
+                        >
+                          {done ? "Completado" : "Hacer check-in"}
+                        </Button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="text-[0.7rem] text-muted-foreground">
+                El siguiente paso será guardar estos registros en el backend para que tu progreso se sincronice entre
+                dispositivos.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="grid gap-6 lg:grid-cols-3" aria-labelledby="progress-heading">
+          <div className="space-y-6 lg:col-span-2">
+            <Card className="shadow-sm">
+              <CardHeader className="pb-3">
+                <CardTitle id="progress-heading" className="text-base sm:text-lg">
+                  Gráficos de progreso
+                </CardTitle>
+                <CardDescription>
+                  Visualiza tus hábitos cumplidos por día y por semana para entender tu evolución.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Tabs defaultValue="week" className="space-y-4">
+                  <TabsList className="grid w-full grid-cols-2">
+                    <TabsTrigger value="week">Semana</TabsTrigger>
+                    <TabsTrigger value="month">Mes</TabsTrigger>
+                  </TabsList>
+                  <TabsContent value="week" className="mt-2">
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={weeklyData} margin={{ left: -24, right: 0 }}>
+                          <XAxis dataKey="day" tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 8,
+                              borderColor: "hsl(var(--border))",
+                            }}
+                          />
+                          <Bar dataKey="completions" fill="hsl(var(--chart-1))" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </TabsContent>
+                  <TabsContent value="month" className="mt-2">
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyData} margin={{ left: -24, right: 0 }}>
+                          <XAxis dataKey="week" tickLine={false} axisLine={false} />
+                          <Tooltip
+                            contentStyle={{
+                              borderRadius: 8,
+                              borderColor: "hsl(var(--border))",
+                            }}
+                          />
+                          <Bar dataKey="completions" fill="hsl(var(--chart-2))" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="space-y-6">
+            <Card className="shadow-sm" aria-labelledby="achievements-heading">
+              <CardHeader className="pb-3">
+                <CardTitle id="achievements-heading" className="flex items-center gap-2 text-base sm:text-lg">
+                  <Trophy className="h-5 w-5 text-primary" />
+                  Logros y medallas
+                </CardTitle>
+                <CardDescription>
+                  Recompensas visuales para mantener alta tu motivación.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {achievements.map((achievement) => (
+                  <div
+                    key={achievement.id}
+                    className="rounded-lg border bg-card/70 px-3 py-2 text-xs shadow-xs"
+                  >
+                    <p className="font-medium">{achievement.title}</p>
+                    <p className="text-[0.7rem] text-muted-foreground">{achievement.description}</p>
+                  </div>
+                ))}
+                <p className="text-[0.7rem] text-muted-foreground">
+                  En la siguiente versión conectaremos estos logros con datos reales desde tu historial almacenado en el
+                  backend.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Card className="shadow-sm" aria-labelledby="reminders-heading">
+              <CardHeader className="pb-3">
+                <CardTitle id="reminders-heading" className="flex items-center gap-2 text-base sm:text-lg">
+                  <Bell className="h-5 w-5 text-primary" />
+                  Recordatorios diarios
+                </CardTitle>
+                <CardDescription>
+                  Define horarios y canales para no olvidar tus hábitos clave.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-xs text-muted-foreground">
+                <p>
+                  Próximo paso: permitir al usuario configurar recordatorios por hábito (mañana, tarde, noche) y
+                  sincronizarlos con notificaciones.
+                </p>
+                <p>
+                  También podremos gestionar recordatorios desde el panel administrador para usuarios específicos.
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+        </section>
+      </main>
     </div>
   );
 };
