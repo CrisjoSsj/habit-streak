@@ -3,6 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ModeToggle } from "@/components/mode-toggle";
 import { Flame, Droplets, BookOpen, Brain, Trophy, Bell } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useMemo, useState } from "react";
@@ -104,14 +105,15 @@ const Index = () => {
           </div>
           <nav className="flex items-center gap-3 text-sm">
             <a href="/" className="text-foreground/80 hover:text-foreground">
-              Panel
+              Inicio
             </a>
             <a href="/admin" className="text-muted-foreground hover:text-foreground">
               Admin
             </a>
-            <Button size="sm" variant="outline" className="ml-2">
-              Iniciar sesión
+            <Button size="sm" variant="outline" className="ml-2" asChild>
+              <a href="/auth">Iniciar sesión</a>
             </Button>
+            <ModeToggle />
           </nav>
         </div>
       </header>
