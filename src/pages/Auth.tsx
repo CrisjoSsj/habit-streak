@@ -210,6 +210,22 @@ const Auth = () => {
                 </form>
               </TabsContent>
             </Tabs>
+
+            <div className="mt-4 rounded-md bg-muted/40 p-3">
+              <p className="text-[0.7rem] font-medium text-muted-foreground">Cuentas de prueba recomendadas</p>
+              <ul className="mt-1 space-y-1 text-[0.7rem] text-muted-foreground">
+                <li>
+                  <span className="font-semibold">Admin:</span> admin@habittrack.test
+                </li>
+                <li>
+                  <span className="font-semibold">Usuario:</span> user@habittrack.test
+                </li>
+              </ul>
+              <p className="mt-1 text-[0.7rem] text-muted-foreground">
+                Crea estas cuentas desde la pestaña &quot;Crear cuenta&quot; y luego inicia sesión con ellas para probar los
+                diferentes perfiles.
+              </p>
+            </div>
           </CardContent>
         </Card>
       </main>
