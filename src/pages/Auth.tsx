@@ -45,10 +45,10 @@ const Auth = () => {
   });
 
   useEffect(() => {
-    // Si ya hay sesión, redirigimos al panel principal
+    // Si ya hay sesión, redirigimos al panel de usuario
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
-        navigate("/", { replace: true });
+        navigate("/app", { replace: true });
       }
     });
   }, [navigate]);
@@ -70,7 +70,7 @@ const Auth = () => {
           return;
         }
 
-        navigate("/", { replace: true });
+        navigate("/app", { replace: true });
       } else {
         const redirectUrl = `${window.location.origin}/`;
         const { error } = await supabase.auth.signUp({
