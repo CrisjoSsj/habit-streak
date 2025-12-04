@@ -4,11 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Flame, Droplets, BookOpen, Brain, Trophy, Bell } from "lucide-react";
+import { Flame, Droplets, BookOpen, Brain, Trophy, Bell, Timer } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
-const habits = [
+type HabitType = "check" | "count" | "timer";
+
+type Habit = {
+  id: string;
+  name: string;
+  description: string;
+  icon: typeof Flame;
+  target: string;
+  category: string;
+  type: HabitType;
+  goal?: number;
+};
+
+const habits: Habit[] = [
   {
     id: "exercise",
     name: "Ejercicio",
@@ -16,6 +29,7 @@ const habits = [
     icon: Flame,
     target: "30 min",
     category: "Movimiento",
+    type: "check",
   },
   {
     id: "water",
@@ -24,6 +38,8 @@ const habits = [
     icon: Droplets,
     target: "8 vasos",
     category: "Hidratación",
+    type: "count",
+    goal: 8,
   },
   {
     id: "reading",
@@ -32,6 +48,7 @@ const habits = [
     icon: BookOpen,
     target: "20 min",
     category: "Crecimiento",
+    type: "check",
   },
   {
     id: "meditation",
@@ -40,6 +57,8 @@ const habits = [
     icon: Brain,
     target: "10 min",
     category: "Bienestar mental",
+    type: "timer",
+    goal: 10,
   },
 ];
 
@@ -80,10 +99,50 @@ const achievements = [
 
 const Index = () => {
   const [todayCompletion, setTodayCompletion] = useState<Record<string, boolean>>({});
+  const [countProgress, setCountProgress] = useState<Record<string, number>>({});
+  const [timerState, setTimerState] = useState<Record<string, { running: boolean; elapsed: number }>>({});
+  const [reminders, setReminders] = useState<{
+    morning: boolean;
+    afternoon: boolean;
+    evening: boolean;
+  }>({
+    morning: true,
+    afternoon: false,
+    evening: false,
+  });
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimerState((prev) => {
+        let hasRunning = false;
+        const next: typeof prev = {};
+        for (const [id, state] of Object.entries(prev)) {
+          if (state.running) {
+            hasRunning = true;
+            next[id] = { ...state, elapsed: state.elapsed + 1 };
+          } else {
+            next[id] = state;
+          }
+        }
+        return hasRunning ? next : prev;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, []);
+
+  const isHabitCompleted = (habit: Habit) => {
+    if (habit.type === "count") {
+      const current = countProgress[habit.id] ?? 0;
+      const goal = habit.goal ?? 0;
+      return goal > 0 && current >= goal;
+    }
+    return !!todayCompletion[habit.id];
+  };
 
   const completedCount = useMemo(
-    () => habits.filter((h) => todayCompletion[h.id]).length,
-    [todayCompletion],
+    () => habits.filter((h) => isHabitCompleted(h)).length,
+    [countProgress, todayCompletion],
   );
 
   const completionPercent = useMemo(
@@ -91,8 +150,45 @@ const Index = () => {
     [completedCount],
   );
 
-  const handleToggleHabit = (id: string) => {
-    setTodayCompletion((prev) => ({ ...prev, [id]: !prev[id] }));
+  const handleToggleHabit = (habit: Habit) => {
+    if (habit.type === "count") {
+      const goal = habit.goal ?? 0;
+      setCountProgress((prev) => {
+        const current = prev[habit.id] ?? 0;
+        if (!goal) {
+          return { ...prev, [habit.id]: current + 1 };
+        }
+        const next = Math.min(current + 1, goal);
+        return { ...prev, [habit.id]: next };
+      });
+      return;
+    }
+
+    setTodayCompletion((prev) => ({ ...prev, [habit.id]: !prev[habit.id] }));
+  };
+
+  const handleStartPauseTimer = (habitId: string) => {
+    setTimerState((prev) => {
+      const current = prev[habitId] ?? { running: false, elapsed: 0 };
+      return {
+        ...prev,
+        [habitId]: { ...current, running: !current.running },
+      };
+    });
+  };
+
+  const handleResetCount = (habitId: string) => {
+    setCountProgress((prev) => ({ ...prev, [habitId]: 0 }));
+  };
+
+  const handleReminderToggle = (key: "morning" | "afternoon" | "evening") => {
+    setReminders((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   };
 
   return (
@@ -106,9 +202,6 @@ const Index = () => {
           <nav className="flex items-center gap-3 text-sm">
             <a href="/" className="text-foreground/80 hover:text-foreground">
               Inicio
-            </a>
-            <a href="/admin" className="text-muted-foreground hover:text-foreground">
-              Admin
             </a>
             <Button size="sm" variant="outline" className="ml-2" asChild>
               <a href="/auth">Iniciar sesión</a>
@@ -132,9 +225,11 @@ const Index = () => {
               un sistema de medallas motivador.
             </p>
             <div className="flex flex-wrap items-center gap-3">
-              <Button size="lg">Comenzar hoy</Button>
-              <Button size="lg" variant="outline" className="border-dashed">
-                Ver cómo funciona
+              <Button size="lg" asChild>
+                <a href="/auth">Comenzar hoy</a>
+              </Button>
+              <Button size="lg" variant="outline" className="border-dashed" asChild>
+                <a href="#how-it-works-heading">Ver cómo funciona</a>
               </Button>
               <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
                 <Flame className="h-4 w-4 text-primary" />
@@ -190,7 +285,11 @@ const Index = () => {
               <ul className="space-y-3">
                 {habits.map((habit) => {
                   const Icon = habit.icon;
-                  const done = !!todayCompletion[habit.id];
+                  const isDone = isHabitCompleted(habit);
+                  const count = countProgress[habit.id] ?? 0;
+                  const timer = timerState[habit.id];
+                  const goal = habit.goal ?? 0;
+
                   return (
                     <li
                       key={habit.id}
@@ -206,15 +305,78 @@ const Index = () => {
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-1">
-                        <span className="text-[0.7rem] text-muted-foreground">Meta: {habit.target}</span>
-                        <Button
-                          size="sm"
-                          variant={done ? "default" : "outline"}
-                          className="h-8 px-3 text-xs"
-                          onClick={() => handleToggleHabit(habit.id)}
-                        >
-                          {done ? "Completado" : "Hacer check-in"}
-                        </Button>
+                        {habit.type === "check" && (
+                          <>
+                            <span className="text-[0.7rem] text-muted-foreground">Meta: {habit.target}</span>
+                            <Button
+                              size="sm"
+                              variant={isDone ? "default" : "outline"}
+                              className="h-8 px-3 text-xs"
+                              onClick={() => handleToggleHabit(habit)}
+                            >
+                              {isDone ? "Completado" : "Hacer check-in"}
+                            </Button>
+                          </>
+                        )}
+
+                        {habit.type === "count" && (
+                          <>
+                            <span className="text-[0.7rem] text-muted-foreground">
+                              Progreso: {count}/{goal || "?"} {habit.id === "water" ? "vasos" : "repeticiones"}
+                            </span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={count >= goal && goal ? "default" : "outline"}
+                                className="h-8 px-3 text-xs"
+                                disabled={goal ? count >= goal : false}
+                                onClick={() => handleToggleHabit(habit)}
+                              >
+                                {goal && count >= goal ? "Completado" : "Registrar +1"}
+                              </Button>
+                              {count > 0 && (
+                                <button
+                                  type="button"
+                                  className="text-[0.65rem] text-muted-foreground underline-offset-2 hover:underline"
+                                  onClick={() => handleResetCount(habit.id)}
+                                >
+                                  Reiniciar
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+
+                        {habit.type === "timer" && (
+                          <>
+                            <span className="text-[0.7rem] text-muted-foreground">Objetivo: {habit.target}</span>
+                            <div className="flex items-center gap-2 text-[0.7rem] text-muted-foreground">
+                              <Timer className="h-3 w-3 text-primary" />
+                              <span>{formatTimer(timer?.elapsed ?? 0)}</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="h-8 px-3 text-xs"
+                                onClick={() => handleStartPauseTimer(habit.id)}
+                              >
+                                {timer?.running ? "Pausar" : "Comenzar"}
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant={isDone ? "default" : "outline"}
+                                className="h-8 px-3 text-xs"
+                                onClick={() => handleToggleHabit(habit)}
+                              >
+                                {isDone ? "Completado" : "Hacer check-in"}
+                              </Button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     </li>
                   );
@@ -320,17 +482,77 @@ const Index = () => {
                   Define horarios y canales para no olvidar tus hábitos clave.
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-2 text-xs text-muted-foreground">
+              <CardContent className="space-y-3 text-xs text-muted-foreground">
                 <p>
-                  Próximo paso: permitir al usuario configurar recordatorios por hábito (mañana, tarde, noche) y
-                  sincronizarlos con notificaciones.
+                  Activa algunos ejemplos de recordatorios para ver cómo podrías organizar tus avisos diarios.
                 </p>
-                <p>
-                  También podremos gestionar recordatorios desde el panel administrador para usuarios específicos.
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={reminders.morning ? "default" : "outline"}
+                    className="h-7 px-3 text-[0.7rem]"
+                    onClick={() => handleReminderToggle("morning")}
+                  >
+                    Mañana · 8:00
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={reminders.afternoon ? "default" : "outline"}
+                    className="h-7 px-3 text-[0.7rem]"
+                    onClick={() => handleReminderToggle("afternoon")}
+                  >
+                    Tarde · 14:00
+                  </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={reminders.evening ? "default" : "outline"}
+                    className="h-7 px-3 text-[0.7rem]"
+                    onClick={() => handleReminderToggle("evening")}
+                  >
+                    Noche · 21:00
+                  </Button>
+                </div>
+                <p className="text-[0.7rem]">
+                  Más adelante estos recordatorios se guardarán en tu cuenta y se sincronizarán con notificaciones
+                  reales.
                 </p>
               </CardContent>
             </Card>
           </div>
+        </section>
+
+        <section
+          className="mt-10 grid gap-6 border-t border-border/60 pt-8 md:grid-cols-3"
+          aria-labelledby="how-it-works-heading"
+        >
+          <article className="space-y-2">
+            <h2
+              id="how-it-works-heading"
+              className="text-sm font-semibold uppercase tracking-wide text-primary"
+            >
+              Cómo funciona HabitTrack
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              1) Crea tus hábitos, 2) Registra tus check-ins diarios y 3) Mira tus rachas y logros crecer con el
+              tiempo.
+            </p>
+          </article>
+          <article className="space-y-2">
+            <h3 className="text-sm font-semibold">Pensado para tu día a día</h3>
+            <p className="text-sm text-muted-foreground">
+              Combina hábitos rápidos de check-in con objetivos por repeticiones y minutos para adaptarse a tu
+              rutina.
+            </p>
+          </article>
+          <article className="space-y-2">
+            <h3 className="text-sm font-semibold">Listo para empezar en minutos</h3>
+            <p className="text-sm text-muted-foreground">
+              Regístrate, prueba las cuentas de ejemplo y luego personaliza todo desde tu panel de usuario.
+            </p>
+          </article>
         </section>
       </main>
     </div>
