@@ -45,6 +45,8 @@ const Auth = () => {
   });
 
   useEffect(() => {
+    document.title = "Acceso a HabitTrack · Inicia sesión o regístrate";
+ 
     // Si ya hay sesión, redirigimos al panel de usuario
     supabase.auth.getSession().then(({ data }) => {
       if (data.session) {
@@ -94,8 +96,46 @@ const Auth = () => {
       setLoading(false);
     }
   };
-
-  return (
+ 
+   const createTestAccount = async (type: "admin" | "user") => {
+     setErrorMessage(null);
+     setInfoMessage(null);
+     setLoading(true);
+ 
+     const email = type === "admin" ? "admin@habittrack.com" : "usuario@habittrack.com";
+     const password = type === "admin" ? "admin123" : "usuario123";
+     const redirectUrl = `${window.location.origin}/`;
+ 
+     try {
+       const { error } = await supabase.auth.signUp({
+         email,
+         password,
+         options: {
+           emailRedirectTo: redirectUrl,
+         },
+       });
+ 
+       if (error) {
+         const message = error.message?.toLowerCase() ?? "";
+         if (message.includes("already") || message.includes("registered") || message.includes("exists")) {
+           setInfoMessage(
+             `La cuenta de prueba (${email}) ya existe. Puedes iniciar sesión directamente con ese correo y contraseña.`,
+           );
+         } else {
+           setErrorMessage(error.message || "No se pudo crear la cuenta de prueba. Inténtalo de nuevo.");
+         }
+         return;
+       }
+ 
+       setInfoMessage(
+         `Cuenta de prueba creada (${email}). Ahora puedes iniciar sesión usando ese correo y contraseña.`,
+       );
+     } finally {
+       setLoading(false);
+     }
+   };
+ 
+   return (
     <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/20">
       <header className="border-b bg-background/80 backdrop-blur">
         <div className="container flex items-center justify-between py-4">
@@ -211,21 +251,46 @@ const Auth = () => {
               </TabsContent>
             </Tabs>
 
-            <div className="mt-4 rounded-md bg-muted/40 p-3">
-              <p className="text-[0.7rem] font-medium text-muted-foreground">Cuentas de prueba recomendadas</p>
-              <ul className="mt-1 space-y-1 text-[0.7rem] text-muted-foreground">
-                <li>
-                  <span className="font-semibold">Admin:</span> admin@habittrack.test
-                </li>
-                <li>
-                  <span className="font-semibold">Usuario:</span> user@habittrack.test
-                </li>
-              </ul>
-              <p className="mt-1 text-[0.7rem] text-muted-foreground">
-                Crea estas cuentas desde la pestaña &quot;Crear cuenta&quot; y luego inicia sesión con ellas para probar los
-                diferentes perfiles.
-              </p>
-            </div>
+            <div className="mt-4 space-y-2 rounded-md bg-muted/40 p-3">
+               <p className="text-[0.7rem] font-medium text-muted-foreground">Cuentas de prueba rápidas</p>
+               <ul className="space-y-1 text-[0.7rem] text-muted-foreground">
+                 <li>
+                   <span className="font-semibold">Admin:</span> admin@habittrack.com / <span className="font-mono">admin123</span>
+                 </li>
+                 <li>
+                   <span className="font-semibold">Usuario:</span> usuario@habittrack.com / {" "}
+                   <span className="font-mono">usuario123</span>
+                 </li>
+               </ul>
+               <p className="text-[0.7rem] text-muted-foreground">
+                 Pulsa uno de estos botones para crear las cuentas de prueba automáticamente (solo la primera vez).
+               </p>
+               <div className="flex flex-wrap gap-2">
+                 <Button
+                   type="button"
+                   size="sm"
+                   variant="outline"
+                   className="h-7 px-2 text-[0.7rem]"
+                   disabled={loading}
+                   onClick={() => createTestAccount("admin")}
+                 >
+                   Crear cuenta admin
+                 </Button>
+                 <Button
+                   type="button"
+                   size="sm"
+                   variant="outline"
+                   className="h-7 px-2 text-[0.7rem]"
+                   disabled={loading}
+                   onClick={() => createTestAccount("user")}
+                 >
+                   Crear cuenta usuario
+                 </Button>
+               </div>
+               <p className="text-[0.65rem] text-muted-foreground">
+                 Después, inicia sesión normalmente con el formulario de arriba usando esos datos.
+               </p>
+             </div>
           </CardContent>
         </Card>
       </main>

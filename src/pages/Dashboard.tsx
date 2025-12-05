@@ -173,8 +173,21 @@ import { Flame, Droplets, BookOpen, Brain, Timer, Bell } from "lucide-react";
      toast({ title: "Hábito creado", description: "Ya puedes registrar tus check-ins de este hábito." });
    };
 
-   const handleToggleCheckHabit = (habitId: string) => {
-     setCheckCompletion((prev) => ({ ...prev, [habitId]: !prev[habitId] }));
+   const handleToggleCheckHabit = (habitId: string, habitType?: HabitType) => {
+     setCheckCompletion((prev) => {
+       const nextValue = !prev[habitId];
+       return { ...prev, [habitId]: nextValue };
+     });
+ 
+     if (habitType === "timer") {
+       setTimerState((prev) => {
+         const current = prev[habitId] ?? { running: false, elapsed: 0 };
+         return {
+           ...prev,
+           [habitId]: { ...current, running: false },
+         };
+       });
+     }
    };
 
    const handleAddCountProgress = (habitId: string, goal: number | undefined, amount: number) => {
@@ -201,6 +214,16 @@ import { Flame, Droplets, BookOpen, Brain, Timer, Bell } from "lucide-react";
        return {
          ...prev,
          [habitId]: { ...current, running: !current.running },
+       };
+     });
+   };
+ 
+   const handleResetTimer = (habitId: string) => {
+     setTimerState((prev) => {
+       const current = prev[habitId] ?? { running: false, elapsed: 0 };
+       return {
+         ...prev,
+         [habitId]: { ...current, running: false, elapsed: 0 },
        };
      });
    };
@@ -515,26 +538,36 @@ import { Flame, Droplets, BookOpen, Brain, Timer, Bell } from "lucide-react";
                                      <Timer className="h-3 w-3 text-primary" />
                                      <span>{formatTimer(timer?.elapsed ?? 0)}</span>
                                    </div>
-                                   <div className="flex items-center gap-2">
-                                     <Button
-                                       type="button"
-                                       size="sm"
-                                       variant="outline"
-                                       className="h-8 px-3 text-xs"
-                                       onClick={() => handleToggleTimer(habit.id)}
-                                     >
-                                       {timer?.running ? "Pausar" : "Comenzar"}
-                                     </Button>
-                                     <Button
-                                       type="button"
-                                       size="sm"
-                                       variant={isDone ? "default" : "outline"}
-                                       className="h-8 px-3 text-xs"
-                                       onClick={() => handleToggleCheckHabit(habit.id)}
-                                     >
-                                       {isDone ? "Completado" : "Check-in manual"}
-                                     </Button>
-                                   </div>
+                                    <div className="flex items-center gap-2">
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 px-3 text-xs"
+                                        onClick={() => handleToggleTimer(habit.id)}
+                                      >
+                                        {timer?.running ? "Pausar" : "Comenzar"}
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-8 px-3 text-xs"
+                                        disabled={!timer || timer.elapsed === 0}
+                                        onClick={() => handleResetTimer(habit.id)}
+                                      >
+                                        Reiniciar
+                                      </Button>
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant={isDone ? "default" : "outline"}
+                                        className="h-8 px-3 text-xs"
+                                        onClick={() => handleToggleCheckHabit(habit.id, "timer")}
+                                      >
+                                        {isDone ? "Completado" : "Check-in manual"}
+                                      </Button>
+                                    </div>
                                  </>
                                )}
                              </div>
