@@ -4,7 +4,10 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ModeToggle } from "@/components/mode-toggle";
-import { Flame, Droplets, BookOpen, Brain, Trophy, Bell, Timer } from "lucide-react";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { Footer } from "@/components/Footer";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { Flame, Droplets, BookOpen, Brain, Trophy, Bell, Timer, Shield, CheckCircle, BarChart3, Target } from "lucide-react";
 import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis } from "recharts";
 import { useEffect, useMemo, useState } from "react";
 
@@ -98,6 +101,7 @@ const achievements = [
 ];
 
 const Index = () => {
+  const { t } = useLanguage();
   const [todayCompletion, setTodayCompletion] = useState<Record<string, boolean>>({});
   const [countProgress, setCountProgress] = useState<Record<string, number>>({});
   const [timerState, setTimerState] = useState<Record<string, { running: boolean; elapsed: number }>>({});
@@ -192,56 +196,62 @@ const Index = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/20">
-      <header className="border-b bg-background/80 backdrop-blur">
+    <div className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-accent/10">
+      <header className="border-b bg-card/80 backdrop-blur sticky top-0 z-50">
         <div className="container flex items-center justify-between py-4">
-          <div className="flex items-baseline gap-2">
-            <span className="text-sm font-semibold tracking-wide text-primary">HABITTRACK</span>
-            <span className="text-xs text-muted-foreground">Seguimiento de hábitos saludables</span>
+          <div className="flex items-center gap-3">
+            <Shield className="h-5 w-5 text-primary" />
+            <div className="flex flex-col">
+              <span className="text-sm font-semibold tracking-wide text-primary">{t("brand")}</span>
+              <span className="text-xs text-muted-foreground">{t("tagline")}</span>
+            </div>
           </div>
-          <nav className="flex items-center gap-3 text-sm">
-            <a href="/" className="text-foreground/80 hover:text-foreground">
-              Inicio
-            </a>
-            <Button size="sm" variant="outline" className="ml-2" asChild>
-              <a href="/auth">Iniciar sesión</a>
+          <nav className="flex items-center gap-2 text-sm">
+            <Button size="sm" variant="outline" asChild>
+              <a href="/auth">{t("login")}</a>
             </Button>
+            <LanguageToggle />
             <ModeToggle />
           </nav>
         </div>
       </header>
 
-      <main className="container py-8">
-        <section className="mb-8 grid gap-6 lg:grid-cols-[2fr,3fr]" aria-labelledby="hero-heading">
-          <div className="space-y-5">
+      <main className="container flex-1 py-8">
+        {/* Hero Section */}
+        <section className="mb-10 grid gap-8 lg:grid-cols-[2fr,3fr]" aria-labelledby="hero-heading">
+          <div className="space-y-6">
+            <div className="flex items-center gap-2">
+              <Badge variant="outline" className="text-xs">
+                ISO 9001:2015
+              </Badge>
+              <Badge variant="secondary" className="text-xs">
+                {t("features")}
+              </Badge>
+            </div>
             <h1
               id="hero-heading"
-              className="text-balance font-serif text-3xl font-semibold tracking-tight text-foreground sm:text-4xl md:text-5xl"
+              className="text-balance font-serif text-3xl font-semibold tracking-tight text-foreground sm:text-4xl lg:text-5xl"
             >
-              Construye hábitos saludables que duren toda la vida.
+              {t("heroTitle")}
             </h1>
-            <p className="max-w-xl text-sm text-muted-foreground sm:text-base">
-              Crea hábitos personalizados, registra tu cumplimiento diario, visualiza rachas y celebra tus logros con
-              un sistema de medallas motivador.
+            <p className="max-w-xl text-sm text-muted-foreground sm:text-base leading-relaxed">
+              {t("heroSubtitle")}
             </p>
             <div className="flex flex-wrap items-center gap-3">
               <Button size="lg" asChild>
-                <a href="/auth">Comenzar hoy</a>
+                <a href="/auth">{t("getStarted")}</a>
               </Button>
-              <Button size="lg" variant="outline" className="border-dashed" asChild>
-                <a href="#how-it-works-heading">Ver cómo funciona</a>
+              <Button size="lg" variant="outline" asChild>
+                <a href="#how-it-works-heading">{t("learnMore")}</a>
               </Button>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground sm:text-sm">
-                <Flame className="h-4 w-4 text-primary" />
-                <span>Rachas, recordatorios y gráficos en tiempo real.</span>
-              </div>
             </div>
 
+            {/* Stats Cards */}
             <div className="grid gap-3 sm:grid-cols-3">
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardDescription>Hábitos de hoy</CardDescription>
-                  <CardTitle className="text-2xl">{completedCount + "/" + habits.length}</CardTitle>
+                  <CardDescription>{t("todayHabits")}</CardDescription>
+                  <CardTitle className="text-2xl">{completedCount}/{habits.length}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <Progress value={completionPercent} aria-label="Progreso de hábitos de hoy" />
@@ -249,37 +259,38 @@ const Index = () => {
               </Card>
               <Card className="shadow-sm">
                 <CardHeader className="pb-2">
-                  <CardDescription>Mejor racha</CardDescription>
-                  <CardTitle className="text-2xl">21 días</CardTitle>
+                  <CardDescription>{t("bestStreak")}</CardDescription>
+                  <CardTitle className="text-2xl">21 {t("days")}</CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground">Sigue así para desbloquear nuevas medallas.</p>
+                  <p className="text-xs text-muted-foreground">{t("achievementsDesc")}</p>
                 </CardContent>
               </Card>
               <Card className="shadow-sm">
                 <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
                   <div>
-                    <CardDescription>Recordatorios</CardDescription>
-                    <CardTitle className="text-2xl">3 activos</CardTitle>
+                    <CardDescription>{t("reminders")}</CardDescription>
+                    <CardTitle className="text-2xl">3 {t("active")}</CardTitle>
                   </div>
                   <Bell className="h-5 w-5 text-primary" />
                 </CardHeader>
                 <CardContent>
-                  <p className="text-xs text-muted-foreground">Configura avisos diarios y horarios flexibles.</p>
+                  <p className="text-xs text-muted-foreground">{t("reminderDesc")}</p>
                 </CardContent>
               </Card>
             </div>
           </div>
 
+          {/* Habits Card */}
           <Card className="shadow-md">
             <CardHeader>
               <CardTitle className="flex items-center justify-between text-base sm:text-lg">
-                Tus hábitos de hoy
+                {t("yourHabitsToday")}
                 <Badge variant="outline" className="text-[0.7rem] font-normal">
-                  Vista ejemplo
+                  {t("viewExample")}
                 </Badge>
               </CardTitle>
-              <CardDescription>Marca tus check-ins diarios y mantén vivas tus rachas.</CardDescription>
+              <CardDescription>{t("markCheckIns")}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <ul className="space-y-3">
@@ -307,14 +318,14 @@ const Index = () => {
                       <div className="flex flex-col items-end gap-1">
                         {habit.type === "check" && (
                           <>
-                            <span className="text-[0.7rem] text-muted-foreground">Meta: {habit.target}</span>
+                            <span className="text-[0.7rem] text-muted-foreground">{t("goal")}: {habit.target}</span>
                             <Button
                               size="sm"
                               variant={isDone ? "default" : "outline"}
                               className="h-8 px-3 text-xs"
                               onClick={() => handleToggleHabit(habit)}
                             >
-                              {isDone ? "Completado" : "Hacer check-in"}
+                              {isDone ? t("completed") : t("checkIn")}
                             </Button>
                           </>
                         )}
@@ -322,7 +333,7 @@ const Index = () => {
                         {habit.type === "count" && (
                           <>
                             <span className="text-[0.7rem] text-muted-foreground">
-                              Progreso: {count}/{goal || "?"} {habit.id === "water" ? "vasos" : "repeticiones"}
+                              {t("progress")}: {count}/{goal || "?"}
                             </span>
                             <div className="flex items-center gap-2">
                               <Button
@@ -333,7 +344,7 @@ const Index = () => {
                                 disabled={goal ? count >= goal : false}
                                 onClick={() => handleToggleHabit(habit)}
                               >
-                                {goal && count >= goal ? "Completado" : "Registrar +1"}
+                                {goal && count >= goal ? t("completed") : t("register")}
                               </Button>
                               {count > 0 && (
                                 <button
@@ -341,7 +352,7 @@ const Index = () => {
                                   className="text-[0.65rem] text-muted-foreground underline-offset-2 hover:underline"
                                   onClick={() => handleResetCount(habit.id)}
                                 >
-                                  Reiniciar
+                                  {t("reset")}
                                 </button>
                               )}
                             </div>
@@ -350,7 +361,7 @@ const Index = () => {
 
                         {habit.type === "timer" && (
                           <>
-                            <span className="text-[0.7rem] text-muted-foreground">Objetivo: {habit.target}</span>
+                            <span className="text-[0.7rem] text-muted-foreground">{t("goal")}: {habit.target}</span>
                             <div className="flex items-center gap-2 text-[0.7rem] text-muted-foreground">
                               <Timer className="h-3 w-3 text-primary" />
                               <span>{formatTimer(timer?.elapsed ?? 0)}</span>
@@ -363,7 +374,7 @@ const Index = () => {
                                 className="h-8 px-3 text-xs"
                                 onClick={() => handleStartPauseTimer(habit.id)}
                               >
-                                {timer?.running ? "Pausar" : "Comenzar"}
+                                {timer?.running ? t("pause") : t("start")}
                               </Button>
                               <Button
                                 type="button"
@@ -372,7 +383,7 @@ const Index = () => {
                                 className="h-8 px-3 text-xs"
                                 onClick={() => handleToggleHabit(habit)}
                               >
-                                {isDone ? "Completado" : "Hacer check-in"}
+                                {isDone ? t("completed") : t("checkIn")}
                               </Button>
                             </div>
                           </>
@@ -382,30 +393,26 @@ const Index = () => {
                   );
                 })}
               </ul>
-              <p className="text-[0.7rem] text-muted-foreground">
-                El siguiente paso será guardar estos registros en el backend para que tu progreso se sincronice entre
-                dispositivos.
-              </p>
             </CardContent>
           </Card>
         </section>
 
+        {/* Progress & Achievements */}
         <section className="grid gap-6 lg:grid-cols-3" aria-labelledby="progress-heading">
           <div className="space-y-6 lg:col-span-2">
             <Card className="shadow-sm">
               <CardHeader className="pb-3">
-                <CardTitle id="progress-heading" className="text-base sm:text-lg">
-                  Gráficos de progreso
+                <CardTitle id="progress-heading" className="flex items-center gap-2 text-base sm:text-lg">
+                  <BarChart3 className="h-5 w-5 text-primary" />
+                  {t("progressCharts")}
                 </CardTitle>
-                <CardDescription>
-                  Visualiza tus hábitos cumplidos por día y por semana para entender tu evolución.
-                </CardDescription>
+                <CardDescription>{t("progressChartsDesc")}</CardDescription>
               </CardHeader>
               <CardContent>
                 <Tabs defaultValue="week" className="space-y-4">
                   <TabsList className="grid w-full grid-cols-2">
-                    <TabsTrigger value="week">Semana</TabsTrigger>
-                    <TabsTrigger value="month">Mes</TabsTrigger>
+                    <TabsTrigger value="week">{t("week")}</TabsTrigger>
+                    <TabsTrigger value="month">{t("month")}</TabsTrigger>
                   </TabsList>
                   <TabsContent value="week" className="mt-2">
                     <div className="h-64">
@@ -449,11 +456,9 @@ const Index = () => {
               <CardHeader className="pb-3">
                 <CardTitle id="achievements-heading" className="flex items-center gap-2 text-base sm:text-lg">
                   <Trophy className="h-5 w-5 text-primary" />
-                  Logros y medallas
+                  {t("achievements")}
                 </CardTitle>
-                <CardDescription>
-                  Recompensas visuales para mantener alta tu motivación.
-                </CardDescription>
+                <CardDescription>{t("achievementsDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3">
                 {achievements.map((achievement) => (
@@ -465,10 +470,6 @@ const Index = () => {
                     <p className="text-[0.7rem] text-muted-foreground">{achievement.description}</p>
                   </div>
                 ))}
-                <p className="text-[0.7rem] text-muted-foreground">
-                  En la siguiente versión conectaremos estos logros con datos reales desde tu historial almacenado en el
-                  backend.
-                </p>
               </CardContent>
             </Card>
 
@@ -476,16 +477,11 @@ const Index = () => {
               <CardHeader className="pb-3">
                 <CardTitle id="reminders-heading" className="flex items-center gap-2 text-base sm:text-lg">
                   <Bell className="h-5 w-5 text-primary" />
-                  Recordatorios diarios
+                  {t("reminderConfig")}
                 </CardTitle>
-                <CardDescription>
-                  Define horarios y canales para no olvidar tus hábitos clave.
-                </CardDescription>
+                <CardDescription>{t("reminderDesc")}</CardDescription>
               </CardHeader>
               <CardContent className="space-y-3 text-xs text-muted-foreground">
-                <p>
-                  Activa algunos ejemplos de recordatorios para ver cómo podrías organizar tus avisos diarios.
-                </p>
                 <div className="flex flex-wrap gap-2">
                   <Button
                     type="button"
@@ -494,7 +490,7 @@ const Index = () => {
                     className="h-7 px-3 text-[0.7rem]"
                     onClick={() => handleReminderToggle("morning")}
                   >
-                    Mañana · 8:00
+                    {t("morning")} · 8:00
                   </Button>
                   <Button
                     type="button"
@@ -503,7 +499,7 @@ const Index = () => {
                     className="h-7 px-3 text-[0.7rem]"
                     onClick={() => handleReminderToggle("afternoon")}
                   >
-                    Tarde · 14:00
+                    {t("afternoon")} · 14:00
                   </Button>
                   <Button
                     type="button"
@@ -512,49 +508,47 @@ const Index = () => {
                     className="h-7 px-3 text-[0.7rem]"
                     onClick={() => handleReminderToggle("evening")}
                   >
-                    Noche · 21:00
+                    {t("evening")} · 21:00
                   </Button>
                 </div>
-                <p className="text-[0.7rem]">
-                  Más adelante estos recordatorios se guardarán en tu cuenta y se sincronizarán con notificaciones
-                  reales.
-                </p>
               </CardContent>
             </Card>
           </div>
         </section>
 
+        {/* How it works */}
         <section
           className="mt-10 grid gap-6 border-t border-border/60 pt-8 md:grid-cols-3"
           aria-labelledby="how-it-works-heading"
+          id="features"
         >
-          <article className="space-y-2">
-            <h2
-              id="how-it-works-heading"
-              className="text-sm font-semibold uppercase tracking-wide text-primary"
-            >
-              Cómo funciona HabitTrack
-            </h2>
-            <p className="text-sm text-muted-foreground">
-              1) Crea tus hábitos, 2) Registra tus check-ins diarios y 3) Mira tus rachas y logros crecer con el
-              tiempo.
-            </p>
+          <article className="space-y-3">
+            <div className="flex items-center gap-2">
+              <Target className="h-5 w-5 text-primary" />
+              <h2 id="how-it-works-heading" className="text-sm font-semibold uppercase tracking-wide text-primary">
+                {t("howItWorks")}
+              </h2>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("howItWorksDesc")}</p>
           </article>
-          <article className="space-y-2">
-            <h3 className="text-sm font-semibold">Pensado para tu día a día</h3>
-            <p className="text-sm text-muted-foreground">
-              Combina hábitos rápidos de check-in con objetivos por repeticiones y minutos para adaptarse a tu
-              rutina.
-            </p>
+          <article className="space-y-3 rounded-lg border bg-card/50 p-4">
+            <div className="flex items-center gap-2">
+              <CheckCircle className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-semibold">{t("step1Title")}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("step1Desc")}</p>
           </article>
-          <article className="space-y-2">
-            <h3 className="text-sm font-semibold">Listo para empezar en minutos</h3>
-            <p className="text-sm text-muted-foreground">
-              Regístrate, prueba las cuentas de ejemplo y luego personaliza todo desde tu panel de usuario.
-            </p>
+          <article className="space-y-3 rounded-lg border bg-card/50 p-4">
+            <div className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              <h3 className="text-sm font-semibold">{t("step2Title")}</h3>
+            </div>
+            <p className="text-sm text-muted-foreground">{t("step2Desc")}</p>
           </article>
         </section>
       </main>
+
+      <Footer />
     </div>
   );
 };
