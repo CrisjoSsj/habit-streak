@@ -1,10 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Language, TranslationKey, getTranslation } from "@/lib/i18n";
+import { Language, TranslationKey, TranslationKeys, getTranslation, translations } from "@/lib/i18n";
 
 type LanguageContextType = {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey) => string;
+  translations: TranslationKeys;
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
@@ -22,12 +23,14 @@ export const LanguageProvider = ({ children }: { children: ReactNode }) => {
 
   const t = (key: TranslationKey): string => getTranslation(language, key);
 
+  const currentTranslations = translations[language];
+
   useEffect(() => {
     document.documentElement.lang = language;
   }, [language]);
 
   return (
-    <LanguageContext.Provider value={{ language, setLanguage, t }}>
+    <LanguageContext.Provider value={{ language, setLanguage, t, translations: currentTranslations }}>
       {children}
     </LanguageContext.Provider>
   );
