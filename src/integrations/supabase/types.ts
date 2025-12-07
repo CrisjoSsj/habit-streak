@@ -14,6 +14,182 @@ export type Database = {
   }
   public: {
     Tables: {
+      achievements: {
+        Row: {
+          achievement_level: number
+          achievement_type: string
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          achievement_level?: number
+          achievement_type: string
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          achievement_level?: number
+          achievement_type?: string
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      global_reminders: {
+        Row: {
+          created_at: string
+          enabled: boolean | null
+          id: string
+          reminder_time: string
+          reminder_type: string
+          repeat_days: string[] | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          enabled?: boolean | null
+          id?: string
+          reminder_time: string
+          reminder_type: string
+          repeat_days?: string[] | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          enabled?: boolean | null
+          id?: string
+          reminder_time?: string
+          reminder_type?: string
+          repeat_days?: string[] | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      habit_completions: {
+        Row: {
+          completion_date: string
+          count_progress: number | null
+          created_at: string
+          habit_id: string
+          id: string
+          is_completed: boolean | null
+          is_rest_day: boolean | null
+          timer_seconds: number | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          completion_date?: string
+          count_progress?: number | null
+          created_at?: string
+          habit_id: string
+          id?: string
+          is_completed?: boolean | null
+          is_rest_day?: boolean | null
+          timer_seconds?: number | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          completion_date?: string
+          count_progress?: number | null
+          created_at?: string
+          habit_id?: string
+          id?: string
+          is_completed?: boolean | null
+          is_rest_day?: boolean | null
+          timer_seconds?: number | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "habit_completions_habit_id_fkey"
+            columns: ["habit_id"]
+            isOneToOne: false
+            referencedRelation: "habits"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      habits: {
+        Row: {
+          color: string | null
+          created_at: string
+          end_date: string | null
+          end_days: number | null
+          end_type: string | null
+          goal_count: number | null
+          goal_minutes: number | null
+          habit_type: string
+          icon: string | null
+          id: string
+          incentive_text: string | null
+          is_archived: boolean | null
+          name: string
+          reminder_enabled: boolean | null
+          reminder_time: string | null
+          repeat_count: number | null
+          repeat_days: string[] | null
+          repeat_type: string | null
+          time_of_day: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string
+          end_date?: string | null
+          end_days?: number | null
+          end_type?: string | null
+          goal_count?: number | null
+          goal_minutes?: number | null
+          habit_type?: string
+          icon?: string | null
+          id?: string
+          incentive_text?: string | null
+          is_archived?: boolean | null
+          name: string
+          reminder_enabled?: boolean | null
+          reminder_time?: string | null
+          repeat_count?: number | null
+          repeat_days?: string[] | null
+          repeat_type?: string | null
+          time_of_day?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string
+          end_date?: string | null
+          end_days?: number | null
+          end_type?: string | null
+          goal_count?: number | null
+          goal_minutes?: number | null
+          habit_type?: string
+          icon?: string | null
+          id?: string
+          incentive_text?: string | null
+          is_archived?: boolean | null
+          name?: string
+          reminder_enabled?: boolean | null
+          reminder_time?: string | null
+          repeat_count?: number | null
+          repeat_days?: string[] | null
+          repeat_type?: string | null
+          time_of_day?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           age: number | null
@@ -44,6 +220,30 @@ export type Database = {
           last_name?: string | null
           phone?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      time_periods: {
+        Row: {
+          created_at: string
+          id: string
+          period_type: string
+          start_time: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          period_type: string
+          start_time: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          period_type?: string
+          start_time?: string
+          user_id?: string
         }
         Relationships: []
       }
