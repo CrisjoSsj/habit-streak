@@ -10,13 +10,13 @@ interface TimeFilterProps {
 }
 
 export const TimeFilter = ({ selected, onSelect }: TimeFilterProps) => {
-  const { translations } = useLanguage();
+  const { t } = useLanguage();
 
   const filters: { id: TimeOfDay; label: string; icon?: React.ReactNode }[] = [
-    { id: "all", label: translations.dashboard.all },
-    { id: "morning", label: translations.dashboard.morning, icon: <Sun className="h-3.5 w-3.5" /> },
-    { id: "afternoon", label: translations.dashboard.afternoon, icon: <Sunset className="h-3.5 w-3.5" /> },
-    { id: "night", label: translations.dashboard.night, icon: <Moon className="h-3.5 w-3.5" /> },
+    { id: "all", label: t("all") },
+    { id: "morning", label: t("morning"), icon: <Sun className="h-3.5 w-3.5" /> },
+    { id: "afternoon", label: t("afternoon"), icon: <Sunset className="h-3.5 w-3.5" /> },
+    { id: "night", label: t("night"), icon: <Moon className="h-3.5 w-3.5" /> },
   ];
 
   return (

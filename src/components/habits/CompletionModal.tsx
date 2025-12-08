@@ -15,7 +15,7 @@ interface CompletionModalProps {
 }
 
 export const CompletionModal = ({ open, onClose }: CompletionModalProps) => {
-  const { translations } = useLanguage();
+  const { t } = useLanguage();
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
@@ -30,14 +30,14 @@ export const CompletionModal = ({ open, onClose }: CompletionModalProps) => {
           </div>
           <div>
             <p className="text-sm font-medium text-muted-foreground">
-              {translations.completion.congratulations}
+              {t("congratulations")}
             </p>
             <DialogTitle className="text-2xl font-bold">
-              {translations.completion.allCompleted}
+              {t("allCompleted")}
             </DialogTitle>
           </div>
           <DialogDescription className="text-base">
-            {translations.completion.message}
+            {t("completionMessage")}
           </DialogDescription>
         </DialogHeader>
         <Button
@@ -45,7 +45,7 @@ export const CompletionModal = ({ open, onClose }: CompletionModalProps) => {
           className="mt-4 w-full bg-primary text-lg font-semibold"
           size="lg"
         >
-          {translations.completion.continue}
+          {t("continue")}
         </Button>
       </DialogContent>
     </Dialog>

@@ -5,13 +5,13 @@ import { useLanguage } from "@/contexts/LanguageContext";
 
 export const BottomNav = () => {
   const location = useLocation();
-  const { translations } = useLanguage();
+  const { t } = useLanguage();
 
   const navItems = [
-    { href: "/app", icon: Calendar, label: translations.nav.today },
-    { href: "/journey", icon: BookOpen, label: translations.nav.journey },
-    { href: "/history", icon: BarChart3, label: translations.nav.history },
-    { href: "/profile", icon: User, label: translations.nav.profile },
+    { href: "/app", icon: Calendar, label: t("navToday") },
+    { href: "/journey", icon: BookOpen, label: t("navJourney") },
+    { href: "/history", icon: BarChart3, label: t("navHistory") },
+    { href: "/profile", icon: User, label: t("navProfile") },
   ];
 
   return (

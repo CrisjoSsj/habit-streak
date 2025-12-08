@@ -55,8 +55,7 @@ export const translations = {
     footerRights: "Todos los derechos reservados.",
     footerCertification: "Certificación de calidad ISO 9001:2015",
     
-    // Misc
-    viewExample: "Vista ejemplo",
+    // Dashboard
     yourHabitsToday: "Sus hábitos de hoy",
     markCheckIns: "Registre sus check-ins diarios y mantenga sus rachas activas.",
     goal: "Meta",
@@ -67,12 +66,32 @@ export const translations = {
     reset: "Reiniciar",
     start: "Iniciar",
     pause: "Pausar",
+    finish: "Finalizar",
+    finishAll: "Completar todo",
+    restDay: "Día de descanso",
+    edit: "Editar",
+    all: "Todos",
+    anytime: "Cualquier hora",
+    min: "min",
+    reps: "reps",
+    
+    // Time of day
+    morning: "Mañana",
+    afternoon: "Tarde",
+    night: "Noche",
+    evening: "Noche",
+    
+    // Progress
     progressCharts: "Gráficos de progreso",
     progressChartsDesc: "Visualice sus hábitos cumplidos por día y semana.",
     week: "Semana",
     month: "Mes",
+    
+    // Achievements
     achievements: "Logros",
     achievementsDesc: "Medallas obtenidas por su constancia.",
+    
+    // How it works
     howItWorks: "Cómo funciona",
     howItWorksDesc: "Proceso estructurado para la gestión efectiva de hábitos.",
     step1Title: "Defina sus hábitos",
@@ -81,11 +100,50 @@ export const translations = {
     step2Desc: "Marque su progreso con check-ins simples.",
     step3Title: "Analice resultados",
     step3Desc: "Visualice estadísticas y patrones de comportamiento.",
+    
+    // Reminders
     reminderConfig: "Configuración de recordatorios",
     reminderDesc: "Programe notificaciones personalizadas.",
-    morning: "Mañana",
-    afternoon: "Tarde",
-    evening: "Noche",
+    
+    // View
+    viewExample: "Vista ejemplo",
+    
+    // Navigation
+    navToday: "Hoy",
+    navJourney: "Recorrido",
+    navHistory: "Historial",
+    navProfile: "Perfil",
+    
+    // Completion modal
+    congratulations: "¡Felicitaciones!",
+    allCompleted: "¡Todos completados!",
+    completionMessage: "Has completado todos tus hábitos de hoy. ¡Sigue así!",
+    continue: "Continuar",
+    
+    // Days of week
+    sun: "D",
+    mon: "L",
+    tue: "M",
+    wed: "X",
+    thu: "J",
+    fri: "V",
+    sat: "S",
+    
+    // Habit form
+    habitFormTitle: "Nuevo hábito",
+    habitFormSubtitle: "¿Qué hábito quieres crear?",
+    habitIcon: "Ícono",
+    habitColor: "Color",
+    doIt: "Hacerlo en",
+    dailyGoal: "Meta diaria",
+    advancedSettings: "Configuración avanzada",
+    reminderForHabit: "Recordatorio para este hábito",
+    incentive: "Incentivo",
+    incentivePlaceholder: "¿Qué te motiva a hacer este hábito?",
+    save: "Guardar",
+    typeCheckIn: "Check-in",
+    typeCounter: "Contador",
+    typeTimer: "Temporizador",
   },
   en: {
     // Header
@@ -141,8 +199,7 @@ export const translations = {
     footerRights: "All rights reserved.",
     footerCertification: "ISO 9001:2015 Quality Certification",
     
-    // Misc
-    viewExample: "Example view",
+    // Dashboard
     yourHabitsToday: "Your habits today",
     markCheckIns: "Record your daily check-ins and keep your streaks active.",
     goal: "Goal",
@@ -153,12 +210,32 @@ export const translations = {
     reset: "Reset",
     start: "Start",
     pause: "Pause",
+    finish: "Finish",
+    finishAll: "Complete all",
+    restDay: "Rest day",
+    edit: "Edit",
+    all: "All",
+    anytime: "Anytime",
+    min: "min",
+    reps: "reps",
+    
+    // Time of day
+    morning: "Morning",
+    afternoon: "Afternoon",
+    night: "Night",
+    evening: "Evening",
+    
+    // Progress
     progressCharts: "Progress Charts",
     progressChartsDesc: "View your completed habits by day and week.",
     week: "Week",
     month: "Month",
+    
+    // Achievements
     achievements: "Achievements",
     achievementsDesc: "Medals earned for your consistency.",
+    
+    // How it works
     howItWorks: "How it works",
     howItWorksDesc: "Structured process for effective habit management.",
     step1Title: "Define your habits",
@@ -167,15 +244,55 @@ export const translations = {
     step2Desc: "Mark your progress with simple check-ins.",
     step3Title: "Analyze results",
     step3Desc: "Visualize statistics and behavior patterns.",
+    
+    // Reminders
     reminderConfig: "Reminder configuration",
     reminderDesc: "Schedule personalized notifications.",
-    morning: "Morning",
-    afternoon: "Afternoon",
-    evening: "Evening",
+    
+    // View
+    viewExample: "Example view",
+    
+    // Navigation
+    navToday: "Today",
+    navJourney: "Journey",
+    navHistory: "History",
+    navProfile: "Profile",
+    
+    // Completion modal
+    congratulations: "Congratulations!",
+    allCompleted: "All completed!",
+    completionMessage: "You've completed all your habits today. Keep it up!",
+    continue: "Continue",
+    
+    // Days of week
+    sun: "S",
+    mon: "M",
+    tue: "T",
+    wed: "W",
+    thu: "T",
+    fri: "F",
+    sat: "S",
+    
+    // Habit form
+    habitFormTitle: "New habit",
+    habitFormSubtitle: "What habit do you want to create?",
+    habitIcon: "Icon",
+    habitColor: "Color",
+    doIt: "Do it at",
+    dailyGoal: "Daily goal",
+    advancedSettings: "Advanced settings",
+    reminderForHabit: "Reminder for this habit",
+    incentive: "Incentive",
+    incentivePlaceholder: "What motivates you to do this habit?",
+    save: "Save",
+    typeCheckIn: "Check-in",
+    typeCounter: "Counter",
+    typeTimer: "Timer",
   },
 } as const;
 
 export type TranslationKey = keyof typeof translations.es;
+export type TranslationKeys = typeof translations.es;
 
 export const getTranslation = (lang: Language, key: TranslationKey): string => {
   return translations[lang][key];

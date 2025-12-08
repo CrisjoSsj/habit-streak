@@ -46,7 +46,7 @@ export const HabitCard = ({
   onRestDay,
   onEdit,
 }: HabitCardProps) => {
-  const { translations } = useLanguage();
+  const { t } = useLanguage();
   const [showCountPicker, setShowCountPicker] = useState(false);
 
   const formatTimer = (seconds: number) => {
@@ -57,12 +57,12 @@ export const HabitCard = ({
 
   const progressText = () => {
     if (habitType === "timer") {
-      return `${Math.floor(timerSeconds / 60)} / ${goalMinutes} ${translations.common.min}`;
+      return `${Math.floor(timerSeconds / 60)} / ${goalMinutes} ${t("min")}`;
     }
     if (habitType === "count") {
-      return `${currentProgress} / ${goalCount} ${translations.common.reps}`;
+      return `${currentProgress} / ${goalCount} ${t("reps")}`;
     }
-    return isCompleted ? translations.dashboard.completed : "";
+    return isCompleted ? t("completed") : "";
   };
 
   return (
@@ -91,7 +91,7 @@ export const HabitCard = ({
                 <p className="text-sm text-primary-foreground/80">
                   {isCompleted ? (
                     <span className="flex items-center gap-1">
-                      <Check className="h-3 w-3" /> {translations.dashboard.completed}
+                      <Check className="h-3 w-3" /> {t("completed")}
                     </span>
                   ) : progressText()}
                 </p>
@@ -107,11 +107,11 @@ export const HabitCard = ({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem onClick={onRestDay}>
                   <Coffee className="mr-2 h-4 w-4" />
-                  {translations.dashboard.restDay}
+                  {t("restDay")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onEdit}>
                   <Check className="mr-2 h-4 w-4" />
-                  {translations.dashboard.edit}
+                  {t("edit")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -132,7 +132,7 @@ export const HabitCard = ({
               </Button>
               <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" onClick={onToggleComplete}>
                 <Check className="h-4 w-4" />
-                {translations.dashboard.finish}
+                {t("finish")}
               </Button>
             </>
           )}
@@ -143,11 +143,11 @@ export const HabitCard = ({
                 {currentProgress} / {goalCount}
               </Button>
               <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" onClick={() => onAddProgress(1)}>
-                {translations.dashboard.finish} 1
+                {t("finish")} 1
               </Button>
               <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" onClick={() => onAddProgress(goalCount - currentProgress)}>
                 <Check className="h-4 w-4" />
-                {translations.dashboard.finishAll}
+                {t("finishAll")}
               </Button>
             </>
           )}
@@ -155,7 +155,7 @@ export const HabitCard = ({
           {habitType === "check" && (
             <Button className="flex-1 gap-2 bg-green-600 hover:bg-green-700" onClick={onToggleComplete}>
               <Check className="h-4 w-4" />
-              {translations.dashboard.finish}
+              {t("finish")}
             </Button>
           )}
         </div>
