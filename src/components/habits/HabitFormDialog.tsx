@@ -46,7 +46,7 @@ const COLORS = ["#3B82F6", "#8B5CF6", "#EC4899", "#EF4444", "#F97316", "#EAB308"
 const WEEKDAYS = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 export const HabitFormDialog = ({ open, onClose, onSave, initialData }: HabitFormDialogProps) => {
-  const { translations } = useLanguage();
+  const { t } = useLanguage();
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showDaysSelector, setShowDaysSelector] = useState(false);
 
@@ -84,28 +84,37 @@ export const HabitFormDialog = ({ open, onClose, onSave, initialData }: HabitFor
     }));
   };
 
-  const dayLabels = [translations.days.sun, translations.days.mon, translations.days.tue, translations.days.wed, translations.days.thu, translations.days.fri, translations.days.sat];
+  const dayLabels = [t("sun"), t("mon"), t("tue"), t("wed"), t("thu"), t("fri"), t("sat")];
+
+  const getTimeLabel = (time: TimeOfDay) => {
+    switch (time) {
+      case "anytime": return t("anytime");
+      case "morning": return t("morning");
+      case "afternoon": return t("afternoon");
+      case "night": return t("night");
+    }
+  };
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>{formData.name || translations.habitForm.title}</DialogTitle>
+          <DialogTitle>{formData.name || t("habitFormTitle")}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6">
           <div>
-            <p className="mb-2 text-sm text-muted-foreground">{translations.habitForm.subtitle}</p>
-            <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder={translations.habitForm.title} />
+            <p className="mb-2 text-sm text-muted-foreground">{t("habitFormSubtitle")}</p>
+            <Input value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder={t("habitFormTitle")} />
           </div>
 
           <div className="rounded-lg border bg-card p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <span>{translations.habitForm.icon}</span>
+              <span>{t("habitIcon")}</span>
               <span className="text-2xl">😊</span>
             </div>
             <div className="border-t pt-3">
-              <span>{translations.habitForm.color}</span>
+              <span>{t("habitColor")}</span>
               <div className="mt-2 flex gap-2">
                 {COLORS.map((color) => (
                   <button key={color} className={cn("h-8 w-8 rounded-full", formData.color === color && "ring-2 ring-primary ring-offset-2")} style={{ backgroundColor: color }} onClick={() => setFormData({ ...formData, color })} />
@@ -115,22 +124,22 @@ export const HabitFormDialog = ({ open, onClose, onSave, initialData }: HabitFor
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">{translations.habitForm.doIt}</p>
+            <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">{t("doIt")}</p>
             <div className="grid grid-cols-2 gap-2">
               {(["anytime", "morning", "afternoon", "night"] as TimeOfDay[]).map((time) => (
                 <button key={time} className={cn("rounded-lg border p-3 text-sm font-medium", formData.timeOfDay === time ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted")} onClick={() => setFormData({ ...formData, timeOfDay: time })}>
-                  {translations.dashboard[time === "anytime" ? "anytime" : time]}
+                  {getTimeLabel(time)}
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">{translations.habitForm.dailyGoal}</p>
+            <p className="mb-2 text-xs font-medium uppercase text-muted-foreground">{t("dailyGoal")}</p>
             <div className="flex gap-2 mb-3">
               {(["check", "count", "timer"] as const).map((type) => (
                 <button key={type} className={cn("flex-1 rounded-lg border p-2 text-xs font-medium", formData.habitType === type ? "border-primary bg-primary text-primary-foreground" : "bg-card hover:bg-muted")} onClick={() => setFormData({ ...formData, habitType: type })}>
-                  {type === "check" ? "Check-in" : type === "count" ? "Contador" : "Temporizador"}
+                  {type === "check" ? t("typeCheckIn") : type === "count" ? t("typeCounter") : t("typeTimer")}
                 </button>
               ))}
             </div>
@@ -140,25 +149,25 @@ export const HabitFormDialog = ({ open, onClose, onSave, initialData }: HabitFor
 
           <Collapsible open={showAdvanced} onOpenChange={setShowAdvanced}>
             <CollapsibleTrigger className="flex w-full items-center justify-between py-2">
-              <span className="font-medium">{translations.habitForm.advancedSettings}</span>
+              <span className="font-medium">{t("advancedSettings")}</span>
               <ChevronDown className={cn("h-5 w-5 transition-transform", showAdvanced && "rotate-180")} />
             </CollapsibleTrigger>
             <CollapsibleContent className="space-y-4 pt-2">
               <div className="rounded-lg border bg-card p-4 space-y-4">
                 <div className="flex items-center justify-between">
-                  <span>{translations.habitForm.reminderForHabit}</span>
+                  <span>{t("reminderForHabit")}</span>
                   <Switch checked={formData.reminderEnabled} onCheckedChange={(checked) => setFormData({ ...formData, reminderEnabled: checked })} />
                 </div>
                 {formData.reminderEnabled && <Input type="time" value={formData.reminderTime} onChange={(e) => setFormData({ ...formData, reminderTime: e.target.value })} />}
                 <div className="border-t pt-3">
-                  <span className="text-sm">{translations.habitForm.incentive}</span>
-                  <Textarea value={formData.incentiveText} onChange={(e) => setFormData({ ...formData, incentiveText: e.target.value })} placeholder={translations.habitForm.incentivePlaceholder} className="mt-2" />
+                  <span className="text-sm">{t("incentive")}</span>
+                  <Textarea value={formData.incentiveText} onChange={(e) => setFormData({ ...formData, incentiveText: e.target.value })} placeholder={t("incentivePlaceholder")} className="mt-2" />
                 </div>
               </div>
             </CollapsibleContent>
           </Collapsible>
 
-          <Button onClick={handleSubmit} className="w-full" size="lg">{translations.habitForm.save}</Button>
+          <Button onClick={handleSubmit} className="w-full" size="lg">{t("save")}</Button>
         </div>
       </DialogContent>
     </Dialog>

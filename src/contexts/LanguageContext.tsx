@@ -1,11 +1,11 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import { Language, TranslationKey, TranslationKeys, getTranslation, translations } from "@/lib/i18n";
+import { Language, TranslationKey, getTranslation, translations } from "@/lib/i18n";
 
 type LanguageContextType = {
   language: Language;
   setLanguage: (lang: Language) => void;
   t: (key: TranslationKey) => string;
-  translations: TranslationKeys;
+  translations: typeof translations.es | typeof translations.en;
 };
 
 const LanguageContext = createContext<LanguageContextType | undefined>(undefined);
