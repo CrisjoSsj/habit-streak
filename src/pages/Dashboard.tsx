@@ -1,662 +1,451 @@
-import { useEffect, useMemo, useState } from "react";
-import type { Session, User } from "@supabase/supabase-js";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
+import { format, startOfWeek, addDays, isToday, isSameDay } from "date-fns";
+import { es, enUS } from "date-fns/locale";
+import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ModeToggle } from "@/components/mode-toggle";
 import { useToast } from "@/hooks/use-toast";
-import { Flame, Droplets, BookOpen, Brain, Timer, Bell } from "lucide-react";
+import { useLanguage } from "@/contexts/LanguageContext";
+import { AppHeader } from "@/components/layout/AppHeader";
+import { BottomNav } from "@/components/layout/BottomNav";
+import { WeekCalendar } from "@/components/habits/WeekCalendar";
+import { TimeFilter } from "@/components/habits/TimeFilter";
+import { HabitCard } from "@/components/habits/HabitCard";
+import { HabitFormDialog } from "@/components/habits/HabitFormDialog";
+import { CompletionModal } from "@/components/habits/CompletionModal";
+import type { Tables } from "@/integrations/supabase/types";
 
- type HabitType = "check" | "count" | "timer";
+type Habit = Tables<"habits">;
+type HabitCompletion = Tables<"habit_completions">;
+type TimeOfDayFilter = "all" | "morning" | "afternoon" | "night";
 
- type Habit = {
-   id: string;
-   name: string;
-   type: HabitType;
-   goalCount?: number;
-   goalMinutes?: number;
- };
+const Dashboard = () => {
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { t, language } = useLanguage();
+  const locale = language === "es" ? es : enUS;
 
- type TimerState = {
-   running: boolean;
-   elapsed: number;
- };
+  const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [timeFilter, setTimeFilter] = useState<TimeOfDayFilter>("all");
+  const [habits, setHabits] = useState<Habit[]>([]);
+  const [completions, setCompletions] = useState<HabitCompletion[]>([]);
+  const [timerStates, setTimerStates] = useState<Record<string, { running: boolean; elapsed: number }>>({});
+  const [showHabitForm, setShowHabitForm] = useState(false);
+  const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
+  const [showCompletionModal, setShowCompletionModal] = useState(false);
 
- type Reminder = {
-   id: string;
-   label: string;
-   time: string; // HH:MM
- };
+  // Auth check
+  useEffect(() => {
+    const checkAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        navigate("/auth", { replace: true });
+        return;
+      }
+      setUserId(session.user.id);
+      setLoading(false);
+    };
+    checkAuth();
 
- const Dashboard = () => {
-   const navigate = useNavigate();
-   const { toast } = useToast();
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) navigate("/auth", { replace: true });
+      else setUserId(session.user.id);
+    });
 
-   const [session, setSession] = useState<Session | null>(null);
-   const [user, setUser] = useState<User | null>(null);
-   const [authLoading, setAuthLoading] = useState(true);
+    return () => subscription.unsubscribe();
+  }, [navigate]);
 
-   const [habits, setHabits] = useState<Habit[]>([]);
-   const [newHabitName, setNewHabitName] = useState("");
-   const [newHabitType, setNewHabitType] = useState<HabitType>("check");
-   const [newHabitGoalCount, setNewHabitGoalCount] = useState(8);
-   const [newHabitGoalMinutes, setNewHabitGoalMinutes] = useState(10);
+  // Fetch habits
+  useEffect(() => {
+    if (!userId) return;
+    const fetchHabits = async () => {
+      const { data, error } = await supabase
+        .from("habits")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("is_archived", false)
+        .order("created_at", { ascending: true });
 
-   const [checkCompletion, setCheckCompletion] = useState<Record<string, boolean>>({});
-   const [countProgress, setCountProgress] = useState<Record<string, number>>({});
-   const [timerState, setTimerState] = useState<Record<string, TimerState>>({});
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+        return;
+      }
+      setHabits(data || []);
+    };
+    fetchHabits();
+  }, [userId, toast]);
 
-   const [reminders, setReminders] = useState<Reminder[]>([]);
-   const [newReminderLabel, setNewReminderLabel] = useState("Recordatorio diario");
-   const [newReminderTime, setNewReminderTime] = useState("08:00");
+  // Fetch completions for selected date
+  useEffect(() => {
+    if (!userId) return;
+    const fetchCompletions = async () => {
+      const dateStr = format(selectedDate, "yyyy-MM-dd");
+      const { data, error } = await supabase
+        .from("habit_completions")
+        .select("*")
+        .eq("user_id", userId)
+        .eq("completion_date", dateStr);
 
-   useEffect(() => {
-     document.title = "Panel de hábitos · HabitTrack";
-   }, []);
+      if (error) {
+        console.error("Error fetching completions:", error);
+        return;
+      }
+      setCompletions(data || []);
+    };
+    fetchCompletions();
+  }, [userId, selectedDate]);
 
-   useEffect(() => {
-     const {
-       data: { subscription },
-     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-       setSession(nextSession);
-       setUser(nextSession?.user ?? null);
+  // Timer interval
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setTimerStates((prev) => {
+        let hasRunning = false;
+        const next: typeof prev = {};
+        for (const [id, state] of Object.entries(prev)) {
+          if (state.running) {
+            hasRunning = true;
+            next[id] = { ...state, elapsed: state.elapsed + 1 };
+          } else {
+            next[id] = state;
+          }
+        }
+        return hasRunning ? next : prev;
+      });
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
-       if (!nextSession) {
-         navigate("/auth", { replace: true });
-       }
-     });
+  // Check if all habits completed
+  useEffect(() => {
+    if (habits.length === 0) return;
+    const allCompleted = habits.every((habit) => {
+      const completion = completions.find((c) => c.habit_id === habit.id);
+      return completion?.is_completed;
+    });
+    if (allCompleted && habits.length > 0) {
+      setShowCompletionModal(true);
+    }
+  }, [completions, habits]);
 
-     supabase.auth
-       .getSession()
-       .then(({ data: { session } }) => {
-         setSession(session);
-         setUser(session?.user ?? null);
+  const getCompletion = (habitId: string): HabitCompletion | undefined => {
+    return completions.find((c) => c.habit_id === habitId);
+  };
 
-         if (!session) {
-           navigate("/auth", { replace: true });
-         }
-       })
-       .finally(() => setAuthLoading(false));
+  const upsertCompletion = async (
+    habitId: string,
+    updates: Partial<HabitCompletion>
+  ) => {
+    if (!userId) return;
+    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const existing = getCompletion(habitId);
 
-     return () => {
-       subscription.unsubscribe();
-     };
-   }, [navigate]);
+    if (existing) {
+      const { error } = await supabase
+        .from("habit_completions")
+        .update(updates)
+        .eq("id", existing.id);
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+        return;
+      }
+      setCompletions((prev) =>
+        prev.map((c) => (c.id === existing.id ? { ...c, ...updates } : c))
+      );
+    } else {
+      const { data, error } = await supabase
+        .from("habit_completions")
+        .insert({
+          habit_id: habitId,
+          user_id: userId,
+          completion_date: dateStr,
+          ...updates,
+        })
+        .select()
+        .single();
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+        return;
+      }
+      if (data) setCompletions((prev) => [...prev, data]);
+    }
+  };
 
-   useEffect(() => {
-     const interval = setInterval(() => {
-       setTimerState((prev) => {
-         let hasRunning = false;
-         const next: typeof prev = {};
+  const handleToggleComplete = async (habit: Habit) => {
+    const completion = getCompletion(habit.id);
+    const isCompleted = !completion?.is_completed;
+    
+    // Stop timer if running
+    if (habit.habit_type === "timer" && timerStates[habit.id]?.running) {
+      setTimerStates((prev) => ({
+        ...prev,
+        [habit.id]: { ...prev[habit.id], running: false },
+      }));
+    }
 
-         for (const [id, state] of Object.entries(prev)) {
-           if (state.running) {
-             hasRunning = true;
-             next[id] = { ...state, elapsed: state.elapsed + 1 };
-           } else {
-             next[id] = state;
-           }
-         }
+    await upsertCompletion(habit.id, {
+      is_completed: isCompleted,
+      timer_seconds: timerStates[habit.id]?.elapsed || completion?.timer_seconds || 0,
+    });
+  };
 
-         return hasRunning ? next : prev;
-       });
-     }, 1000);
+  const handleAddProgress = async (habit: Habit, amount: number) => {
+    const completion = getCompletion(habit.id);
+    const currentProgress = completion?.count_progress || 0;
+    const newProgress = Math.min(currentProgress + amount, habit.goal_count || 1);
+    const isCompleted = newProgress >= (habit.goal_count || 1);
 
-     return () => clearInterval(interval);
-   }, []);
+    await upsertCompletion(habit.id, {
+      count_progress: newProgress,
+      is_completed: isCompleted,
+    });
+  };
 
-   const handleSignOut = async () => {
-     const { error } = await supabase.auth.signOut();
+  const handleToggleTimer = (habitId: string) => {
+    setTimerStates((prev) => {
+      const current = prev[habitId] || { running: false, elapsed: 0 };
+      return { ...prev, [habitId]: { ...current, running: !current.running } };
+    });
+  };
 
-     if (error) {
-       toast({
-         variant: "destructive",
-         title: "Error al cerrar sesión",
-         description: error.message || "Inténtalo de nuevo más tarde.",
-       });
-       return;
-     }
+  const handleResetTimer = (habitId: string) => {
+    setTimerStates((prev) => ({
+      ...prev,
+      [habitId]: { running: false, elapsed: 0 },
+    }));
+  };
 
-     toast({ title: "Sesión cerrada", description: "Has salido de HabitTrack correctamente." });
-     navigate("/", { replace: true });
-   };
+  const handleRestDay = async (habitId: string) => {
+    await upsertCompletion(habitId, { is_rest_day: true, is_completed: true });
+    toast({ title: t("restDay"), description: "Hábito marcado como día de descanso." });
+  };
 
-   const handleAddHabit = () => {
-     const name = newHabitName.trim();
+  const handleEditHabit = (habit: Habit) => {
+    setEditingHabit(habit);
+    setShowHabitForm(true);
+  };
 
-     if (!name) {
-       toast({
-         variant: "destructive",
-         title: "Nombre requerido",
-         description: "Añade un nombre para tu hábito.",
-       });
-       return;
-     }
+  const handleSaveHabit = async (formData: any) => {
+    if (!userId) return;
 
-     if (newHabitType === "count" && (!Number.isFinite(newHabitGoalCount) || newHabitGoalCount <= 0)) {
-       toast({
-         variant: "destructive",
-         title: "Meta inválida",
-         description: "La meta de repeticiones debe ser un número mayor que 0.",
-       });
-       return;
-     }
+    const habitData = {
+      user_id: userId,
+      name: formData.name,
+      icon: formData.icon,
+      color: formData.color,
+      habit_type: formData.habitType,
+      goal_count: formData.goalCount,
+      goal_minutes: formData.goalMinutes,
+      time_of_day: formData.timeOfDay,
+      repeat_type: formData.repeatType,
+      repeat_days: formData.repeatDays,
+      repeat_count: formData.repeatCount,
+      reminder_enabled: formData.reminderEnabled,
+      reminder_time: formData.reminderTime,
+      incentive_text: formData.incentiveText,
+      end_type: formData.endType,
+      end_date: formData.endDate ? format(formData.endDate, "yyyy-MM-dd") : null,
+      end_days: formData.endDays,
+    };
 
-     if (newHabitType === "timer" && (!Number.isFinite(newHabitGoalMinutes) || newHabitGoalMinutes <= 0)) {
-       toast({
-         variant: "destructive",
-         title: "Meta inválida",
-         description: "La meta de minutos debe ser un número mayor que 0.",
-       });
-       return;
-     }
+    if (editingHabit) {
+      const { error } = await supabase
+        .from("habits")
+        .update(habitData)
+        .eq("id", editingHabit.id);
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+        return;
+      }
+      setHabits((prev) =>
+        prev.map((h) => (h.id === editingHabit.id ? { ...h, ...habitData } : h))
+      );
+      toast({ title: "Hábito actualizado" });
+    } else {
+      const { data, error } = await supabase
+        .from("habits")
+        .insert(habitData)
+        .select()
+        .single();
+      if (error) {
+        toast({ variant: "destructive", title: "Error", description: error.message });
+        return;
+      }
+      if (data) setHabits((prev) => [...prev, data]);
+      toast({ title: "Hábito creado" });
+    }
 
-     const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `habit-${Date.now()}`;
+    setEditingHabit(null);
+    setShowHabitForm(false);
+  };
 
-     const habit: Habit = {
-       id,
-       name,
-       type: newHabitType,
-       goalCount: newHabitType === "count" ? newHabitGoalCount : undefined,
-       goalMinutes: newHabitType === "timer" ? newHabitGoalMinutes : undefined,
-     };
+  // Filter habits by time of day
+  const filteredHabits = habits.filter((habit) => {
+    if (timeFilter === "all") return true;
+    if (habit.time_of_day === "anytime") return true;
+    return habit.time_of_day === timeFilter;
+  });
 
-     setHabits((prev) => [...prev, habit]);
-     setNewHabitName("");
-     setNewHabitGoalCount(8);
-     setNewHabitGoalMinutes(10);
+  // Group habits by time of day
+  const groupedHabits = {
+    anytime: filteredHabits.filter((h) => h.time_of_day === "anytime"),
+    morning: filteredHabits.filter((h) => h.time_of_day === "morning"),
+    afternoon: filteredHabits.filter((h) => h.time_of_day === "afternoon"),
+    night: filteredHabits.filter((h) => h.time_of_day === "night"),
+  };
 
-     toast({ title: "Hábito creado", description: "Ya puedes registrar tus check-ins de este hábito." });
-   };
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">{t("checkingSession")}</p>
+      </div>
+    );
+  }
 
-   const handleToggleCheckHabit = (habitId: string, habitType?: HabitType) => {
-     setCheckCompletion((prev) => {
-       const nextValue = !prev[habitId];
-       return { ...prev, [habitId]: nextValue };
-     });
- 
-     if (habitType === "timer") {
-       setTimerState((prev) => {
-         const current = prev[habitId] ?? { running: false, elapsed: 0 };
-         return {
-           ...prev,
-           [habitId]: { ...current, running: false },
-         };
-       });
-     }
-   };
+  return (
+    <div className="min-h-screen bg-background pb-20 md:pb-4">
+      <AppHeader />
 
-   const handleAddCountProgress = (habitId: string, goal: number | undefined, amount: number) => {
-     if (!amount || amount <= 0) return;
+      <main className="container max-w-2xl space-y-4 px-4 py-4">
+        {/* Header with date and add button */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">{t("today")}</h1>
+            <p className="text-sm text-muted-foreground">
+              {format(selectedDate, "d MMM", { locale })}
+            </p>
+          </div>
+          <Button
+            size="icon"
+            className="h-12 w-12 rounded-full"
+            onClick={() => {
+              setEditingHabit(null);
+              setShowHabitForm(true);
+            }}
+          >
+            <Plus className="h-6 w-6" />
+          </Button>
+        </div>
 
-     setCountProgress((prev) => {
-       const current = prev[habitId] ?? 0;
-       if (!goal) {
-         return { ...prev, [habitId]: current + amount };
-       }
+        {/* Week Calendar */}
+        <WeekCalendar
+          selectedDate={selectedDate}
+          onSelectDate={setSelectedDate}
+          completions={completions}
+          habits={habits}
+        />
 
-       const next = Math.min(current + amount, goal);
-       return { ...prev, [habitId]: next };
-     });
-   };
+        {/* Time Filter */}
+        <TimeFilter selected={timeFilter} onSelect={setTimeFilter} />
 
-   const handleResetCount = (habitId: string) => {
-     setCountProgress((prev) => ({ ...prev, [habitId]: 0 }));
-   };
+        {/* Habit Lists by Time of Day */}
+        {filteredHabits.length === 0 ? (
+          <div className="py-8 text-center">
+            <p className="text-muted-foreground">{t("noHabitsYet")}</p>
+            <Button
+              variant="outline"
+              className="mt-4"
+              onClick={() => setShowHabitForm(true)}
+            >
+              {t("createNewHabit")}
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groupedHabits).map(([timeOfDay, habitList]) => {
+              if (habitList.length === 0) return null;
+              const label = timeOfDay === "anytime" ? t("anyMoment") : t(timeOfDay as any);
+              
+              return (
+                <div key={timeOfDay} className="space-y-3">
+                  <h2 className="text-xs font-semibold uppercase text-muted-foreground">
+                    {label}
+                  </h2>
+                  {habitList.map((habit) => {
+                    const completion = getCompletion(habit.id);
+                    const timerState = timerStates[habit.id] || { running: false, elapsed: 0 };
+                    
+                    return (
+                      <HabitCard
+                        key={habit.id}
+                        id={habit.id}
+                        name={habit.name}
+                        icon={habit.icon || "smile"}
+                        color={habit.color || "#3B82F6"}
+                        habitType={habit.habit_type as "check" | "count" | "timer"}
+                        goalCount={habit.goal_count || 1}
+                        goalMinutes={habit.goal_minutes || 10}
+                        currentProgress={completion?.count_progress || 0}
+                        timerSeconds={timerState.elapsed || completion?.timer_seconds || 0}
+                        isTimerRunning={timerState.running}
+                        isCompleted={completion?.is_completed || false}
+                        onToggleComplete={() => handleToggleComplete(habit)}
+                        onAddProgress={(amount) => handleAddProgress(habit, amount)}
+                        onToggleTimer={() => handleToggleTimer(habit.id)}
+                        onResetTimer={() => handleResetTimer(habit.id)}
+                        onRestDay={() => handleRestDay(habit.id)}
+                        onEdit={() => handleEditHabit(habit)}
+                      />
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
-   const handleToggleTimer = (habitId: string) => {
-     setTimerState((prev) => {
-       const current = prev[habitId] ?? { running: false, elapsed: 0 };
-       return {
-         ...prev,
-         [habitId]: { ...current, running: !current.running },
-       };
-     });
-   };
- 
-   const handleResetTimer = (habitId: string) => {
-     setTimerState((prev) => {
-       const current = prev[habitId] ?? { running: false, elapsed: 0 };
-       return {
-         ...prev,
-         [habitId]: { ...current, running: false, elapsed: 0 },
-       };
-     });
-   };
+        {/* Create new habit button at bottom */}
+        {habits.length > 0 && (
+          <Button
+            variant="secondary"
+            className="w-full"
+            onClick={() => {
+              setEditingHabit(null);
+              setShowHabitForm(true);
+            }}
+          >
+            {t("createNewHabit")}
+          </Button>
+        )}
+      </main>
 
-   const handleReminderAdd = () => {
-     const label = newReminderLabel.trim() || "Recordatorio";
+      <BottomNav />
 
-     if (!newReminderTime) {
-       toast({
-         variant: "destructive",
-         title: "Hora requerida",
-         description: "Selecciona una hora para el recordatorio.",
-       });
-       return;
-     }
+      <HabitFormDialog
+        open={showHabitForm}
+        onClose={() => {
+          setShowHabitForm(false);
+          setEditingHabit(null);
+        }}
+        onSave={handleSaveHabit}
+        initialData={editingHabit ? {
+          name: editingHabit.name,
+          icon: editingHabit.icon || "smile",
+          color: editingHabit.color || "#3B82F6",
+          habitType: editingHabit.habit_type as "check" | "count" | "timer",
+          goalCount: editingHabit.goal_count || 1,
+          goalMinutes: editingHabit.goal_minutes || 10,
+          timeOfDay: editingHabit.time_of_day as any,
+          repeatType: editingHabit.repeat_type as any,
+          repeatDays: editingHabit.repeat_days || [],
+          repeatCount: editingHabit.repeat_count || 7,
+          reminderEnabled: editingHabit.reminder_enabled || false,
+          reminderTime: editingHabit.reminder_time || "22:30",
+          incentiveText: editingHabit.incentive_text || "",
+          endType: editingHabit.end_type as any,
+          endDate: editingHabit.end_date ? new Date(editingHabit.end_date) : undefined,
+          endDays: editingHabit.end_days || 30,
+        } : undefined}
+      />
 
-     const id = typeof crypto !== "undefined" && "randomUUID" in crypto ? crypto.randomUUID() : `reminder-${Date.now()}`;
+      <CompletionModal
+        open={showCompletionModal}
+        onClose={() => setShowCompletionModal(false)}
+      />
+    </div>
+  );
+};
 
-     setReminders((prev) => [...prev, { id, label, time: newReminderTime }]);
-     toast({ title: "Recordatorio añadido", description: `Se activará cada día a las ${newReminderTime}.` });
-   };
-
-   const handleReminderRemove = (id: string) => {
-     setReminders((prev) => prev.filter((reminder) => reminder.id !== id));
-   };
-
-   const isHabitCompleted = (habit: Habit) => {
-     if (habit.type === "count") {
-       const goal = habit.goalCount ?? 0;
-       const current = countProgress[habit.id] ?? 0;
-       return goal > 0 && current >= goal;
-     }
-
-     return !!checkCompletion[habit.id];
-   };
-
-   const totalHabits = habits.length;
-   const completedHabits = useMemo(
-     () => habits.filter((habit) => isHabitCompleted(habit)).length,
-     [habits, countProgress, checkCompletion],
-   );
-   const completionPercent = totalHabits ? Math.round((completedHabits / totalHabits) * 100) : 0;
-
-   const formatTimer = (seconds: number) => {
-     const mins = Math.floor(seconds / 60);
-     const secs = seconds % 60;
-     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
-   };
-
-   if (authLoading) {
-     return (
-       <div className="flex min-h-screen items-center justify-center bg-background">
-         <p className="text-sm text-muted-foreground">Comprobando tu sesión...</p>
-       </div>
-     );
-   }
-
-   return (
-     <div className="min-h-screen bg-gradient-to-b from-background via-background to-accent/20">
-       <header className="border-b bg-background/80 backdrop-blur">
-         <div className="container flex items-center justify-between py-4">
-           <div className="flex flex-col gap-1">
-             <span className="text-xs font-semibold tracking-wide text-primary">HABITTRACK · Panel</span>
-             <span className="text-xs text-muted-foreground">
-               Hola, {user?.email ?? "usuario"}. Gestiona aquí tus hábitos y recordatorios.
-             </span>
-           </div>
-           <nav className="flex items-center gap-3 text-sm">
-             <Button variant="outline" size="sm" asChild>
-               <a href="/">Ir a la landing</a>
-             </Button>
-             <ModeToggle />
-             <Button variant="outline" size="sm" onClick={handleSignOut}>
-               Cerrar sesión
-             </Button>
-           </nav>
-         </div>
-       </header>
-
-       <main className="container space-y-6 py-8">
-         <section className="grid gap-4 md:grid-cols-3" aria-label="Resumen de hábitos">
-           <Card className="shadow-sm">
-             <CardHeader className="pb-2">
-               <CardDescription>Hábitos de hoy</CardDescription>
-               <CardTitle className="text-2xl">{completedHabits + "/" + totalHabits}</CardTitle>
-             </CardHeader>
-             <CardContent>
-               <p className="text-xs text-muted-foreground">
-                 Marca tus check-ins diarios y mantén vivas tus rachas.
-               </p>
-             </CardContent>
-           </Card>
-
-           <Card className="shadow-sm">
-             <CardHeader className="pb-2">
-               <CardDescription>Porcentaje completado</CardDescription>
-               <CardTitle className="text-2xl">{completionPercent}%</CardTitle>
-             </CardHeader>
-             <CardContent>
-               <p className="text-xs text-muted-foreground">Cuando guardemos en el backend, verás tus estadísticas aquí.</p>
-             </CardContent>
-           </Card>
-
-           <Card className="shadow-sm">
-             <CardHeader className="pb-2 flex-row items-center justify-between space-y-0">
-               <div>
-                 <CardDescription>Recordatorios activos</CardDescription>
-                 <CardTitle className="text-2xl">{reminders.length}</CardTitle>
-               </div>
-               <Bell className="h-5 w-5 text-primary" />
-             </CardHeader>
-             <CardContent>
-               <p className="text-xs text-muted-foreground">Configura avisos diarios a la hora exacta que prefieras.</p>
-             </CardContent>
-           </Card>
-         </section>
-
-         <section aria-label="Gestión de hábitos y recordatorios">
-           <Tabs defaultValue="habits" className="space-y-4">
-             <TabsList>
-               <TabsTrigger value="habits">Mis hábitos</TabsTrigger>
-               <TabsTrigger value="reminders">Recordatorios</TabsTrigger>
-             </TabsList>
-
-             <TabsContent value="habits" className="space-y-4">
-               <Card className="shadow-sm">
-                 <CardHeader>
-                   <CardTitle className="flex items-center justify-between text-base sm:text-lg">
-                     Crear nuevos hábitos
-                     <Badge variant="outline" className="text-[0.7rem]">
-                       Solo tú los ves
-                     </Badge>
-                   </CardTitle>
-                   <CardDescription>Define el tipo de hábito y su meta diaria.</CardDescription>
-                 </CardHeader>
-                 <CardContent className="space-y-4">
-                   <div className="grid gap-3 md:grid-cols-[2fr,1fr,1fr,auto]">
-                     <div>
-                       <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="habit-name">
-                         Nombre del hábito
-                       </label>
-                       <Input
-                         id="habit-name"
-                         placeholder="Ej. 8 vasos de agua"
-                         value={newHabitName}
-                         onChange={(e) => setNewHabitName(e.target.value)}
-                       />
-                     </div>
-                     <div>
-                       <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="habit-type">
-                         Tipo de hábito
-                       </label>
-                       <select
-                         id="habit-type"
-                         className="flex h-10 w-full items-center justify-between rounded-md border bg-background px-3 text-xs text-foreground shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                         value={newHabitType}
-                         onChange={(e) => setNewHabitType(e.target.value as HabitType)}
-                       >
-                         <option value="check">Check-in simple</option>
-                         <option value="count">Contador (0/n)</option>
-                         <option value="timer">Minutos (temporizador)</option>
-                       </select>
-                     </div>
-                     {newHabitType === "count" && (
-                       <div>
-                         <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="habit-goal-count">
-                           Meta diaria
-                         </label>
-                         <Input
-                           id="habit-goal-count"
-                           type="number"
-                           min={1}
-                           value={newHabitGoalCount}
-                           onChange={(e) => setNewHabitGoalCount(Number(e.target.value) || 0)}
-                         />
-                       </div>
-                     )}
-                     {newHabitType === "timer" && (
-                       <div>
-                         <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="habit-goal-minutes">
-                           Minutos objetivo
-                         </label>
-                         <Input
-                           id="habit-goal-minutes"
-                           type="number"
-                           min={1}
-                           value={newHabitGoalMinutes}
-                           onChange={(e) => setNewHabitGoalMinutes(Number(e.target.value) || 0)}
-                         />
-                       </div>
-                     )}
-                     <div className="flex items-end">
-                       <Button type="button" className="w-full" onClick={handleAddHabit}>
-                         Añadir hábito
-                       </Button>
-                     </div>
-                   </div>
-                 </CardContent>
-               </Card>
-
-               <Card className="shadow-sm">
-                 <CardHeader>
-                   <CardTitle className="flex items-center justify-between text-base sm:text-lg">
-                     Hábitos de hoy
-                     <Badge variant="outline" className="text-[0.7rem]">
-                       Interfaz de usuario
-                     </Badge>
-                   </CardTitle>
-                   <CardDescription>
-                     Marca tus check-ins diarios. Más adelante guardaremos estos datos en el backend.
-                   </CardDescription>
-                 </CardHeader>
-                 <CardContent className="space-y-3">
-                   {habits.length === 0 ? (
-                     <p className="text-xs text-muted-foreground">
-                       Todavía no has creado ningún hábito. Empieza añadiendo uno arriba.
-                     </p>
-                   ) : (
-                     <ul className="space-y-3">
-                       {habits.map((habit) => {
-                         const isDone = isHabitCompleted(habit);
-                         const count = countProgress[habit.id] ?? 0;
-                         const timer = timerState[habit.id];
-
-                         const Icon =
-                           habit.type === "check" ? Flame : habit.type === "count" ? Droplets : habit.type === "timer" ? Brain : BookOpen;
-
-                         return (
-                           <li
-                             key={habit.id}
-                             className="flex items-center justify-between rounded-lg border bg-card/70 px-3 py-2.5 text-sm shadow-xs"
-                           >
-                             <div className="flex min-w-0 items-center gap-3">
-                               <span className="flex h-9 w-9 items-center justify-center rounded-full bg-accent text-accent-foreground">
-                                 <Icon className="h-4 w-4" />
-                               </span>
-                               <div className="min-w-0">
-                                 <p className="truncate font-medium">{habit.name}</p>
-                                 <p className="truncate text-[0.7rem] text-muted-foreground">
-                                   {habit.type === "check" && "Marcar una vez al día."}
-                                   {habit.type === "count" &&
-                                     `Objetivo: ${habit.goalCount ?? "?"} repeticiones. Puedes registrar varias de golpe.`}
-                                   {habit.type === "timer" &&
-                                     `Objetivo: ${habit.goalMinutes ?? "?"} min. Usa el temporizador o haz check-in manual.`}
-                                 </p>
-                               </div>
-                             </div>
-                             <div className="flex flex-col items-end gap-1">
-                               {habit.type === "check" && (
-                                 <Button
-                                   type="button"
-                                   size="sm"
-                                   variant={isDone ? "default" : "outline"}
-                                   className="h-8 px-3 text-xs"
-                                   onClick={() => handleToggleCheckHabit(habit.id)}
-                                 >
-                                   {isDone ? "Completado" : "Hacer check-in"}
-                                 </Button>
-                               )}
-
-                               {habit.type === "count" && (
-                                 <>
-                                   <span className="text-[0.7rem] text-muted-foreground">
-                                     Progreso: {count}/{habit.goalCount ?? "?"}
-                                   </span>
-                                   <div className="flex items-center gap-2">
-                                     <Button
-                                       type="button"
-                                       size="sm"
-                                       variant={isDone ? "default" : "outline"}
-                                       className="h-8 px-3 text-xs"
-                                       disabled={isDone}
-                                       onClick={() => handleAddCountProgress(habit.id, habit.goalCount, 1)}
-                                     >
-                                       +1
-                                     </Button>
-                                     <Button
-                                       type="button"
-                                       size="sm"
-                                       variant="outline"
-                                       className="h-8 px-3 text-xs"
-                                       disabled={isDone || !habit.goalCount}
-                                       onClick={() =>
-                                         handleAddCountProgress(
-                                           habit.id,
-                                           habit.goalCount,
-                                           habit.goalCount ? habit.goalCount - count : 0,
-                                         )
-                                       }
-                                     >
-                                       Todo
-                                     </Button>
-                                     {count > 0 && (
-                                       <button
-                                         type="button"
-                                         className="text-[0.65rem] text-muted-foreground underline-offset-2 hover:underline"
-                                         onClick={() => handleResetCount(habit.id)}
-                                       >
-                                         Reiniciar
-                                       </button>
-                                     )}
-                                   </div>
-                                 </>
-                               )}
-
-                               {habit.type === "timer" && (
-                                 <>
-                                   <span className="text-[0.7rem] text-muted-foreground">
-                                     Objetivo: {habit.goalMinutes ?? "?"} min
-                                   </span>
-                                   <div className="flex items-center gap-2 text-[0.7rem] text-muted-foreground">
-                                     <Timer className="h-3 w-3 text-primary" />
-                                     <span>{formatTimer(timer?.elapsed ?? 0)}</span>
-                                   </div>
-                                    <div className="flex items-center gap-2">
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 px-3 text-xs"
-                                        onClick={() => handleToggleTimer(habit.id)}
-                                      >
-                                        {timer?.running ? "Pausar" : "Comenzar"}
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 px-3 text-xs"
-                                        disabled={!timer || timer.elapsed === 0}
-                                        onClick={() => handleResetTimer(habit.id)}
-                                      >
-                                        Reiniciar
-                                      </Button>
-                                      <Button
-                                        type="button"
-                                        size="sm"
-                                        variant={isDone ? "default" : "outline"}
-                                        className="h-8 px-3 text-xs"
-                                        onClick={() => handleToggleCheckHabit(habit.id, "timer")}
-                                      >
-                                        {isDone ? "Completado" : "Check-in manual"}
-                                      </Button>
-                                    </div>
-                                 </>
-                               )}
-                             </div>
-                           </li>
-                         );
-                       })}
-                     </ul>
-                   )}
-                 </CardContent>
-               </Card>
-             </TabsContent>
-
-             <TabsContent value="reminders" className="space-y-4">
-               <Card className="shadow-sm">
-                 <CardHeader>
-                   <CardTitle className="text-base sm:text-lg">Recordatorios personalizados</CardTitle>
-                   <CardDescription>
-                     Define recordatorios a la hora exacta que prefieras. Más adelante podremos conectarlos con
-                     notificaciones reales.
-                   </CardDescription>
-                 </CardHeader>
-                 <CardContent className="space-y-4">
-                   <div className="grid gap-3 md:grid-cols-[2fr,1fr,auto]">
-                     <div>
-                       <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="reminder-label">
-                         Nombre del recordatorio
-                       </label>
-                       <Input
-                         id="reminder-label"
-                         placeholder="Ej. Recordatorio de agua"
-                         value={newReminderLabel}
-                         onChange={(e) => setNewReminderLabel(e.target.value)}
-                       />
-                     </div>
-                     <div>
-                       <label className="mb-1 block text-xs font-medium text-muted-foreground" htmlFor="reminder-time">
-                         Hora
-                       </label>
-                       <Input
-                         id="reminder-time"
-                         type="time"
-                         value={newReminderTime}
-                         onChange={(e) => setNewReminderTime(e.target.value)}
-                       />
-                     </div>
-                     <div className="flex items-end">
-                       <Button type="button" className="w-full" onClick={handleReminderAdd}>
-                         Añadir recordatorio
-                       </Button>
-                     </div>
-                   </div>
-
-                   {reminders.length === 0 ? (
-                     <p className="text-xs text-muted-foreground">
-                       Aún no tienes recordatorios configurados. Empieza creando uno arriba.
-                     </p>
-                   ) : (
-                     <ul className="space-y-2">
-                       {reminders.map((reminder) => (
-                         <li
-                           key={reminder.id}
-                           className="flex items-center justify-between rounded-md border bg-card/70 px-3 py-2 text-sm"
-                         >
-                           <div>
-                             <p className="font-medium">{reminder.label}</p>
-                             <p className="text-[0.7rem] text-muted-foreground">
-                               Todos los días a las {reminder.time}
-                             </p>
-                           </div>
-                           <Button
-                             variant="outline"
-                             size="sm"
-                             className="h-8 px-3 text-xs"
-                             onClick={() => handleReminderRemove(reminder.id)}
-                           >
-                             Eliminar
-                           </Button>
-                         </li>
-                       ))}
-                     </ul>
-                   )}
-                 </CardContent>
-               </Card>
-             </TabsContent>
-           </Tabs>
-         </section>
-       </main>
-     </div>
-   );
- };
-
- export default Dashboard;
+export default Dashboard;

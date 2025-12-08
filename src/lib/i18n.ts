@@ -56,6 +56,7 @@ export const translations = {
     footerCertification: "Certificación de calidad ISO 9001:2015",
     
     // Dashboard
+    today: "HOY",
     yourHabitsToday: "Sus hábitos de hoy",
     markCheckIns: "Registre sus check-ins diarios y mantenga sus rachas activas.",
     goal: "Meta",
@@ -72,8 +73,11 @@ export const translations = {
     edit: "Editar",
     all: "Todos",
     anytime: "Cualquier hora",
+    anyMoment: "Cualquier momento",
     min: "min",
     reps: "reps",
+    createNewHabit: "Crear un nuevo hábito",
+    noHabitsYet: "Todavía no has creado ningún hábito.",
     
     // Time of day
     morning: "Mañana",
@@ -90,6 +94,21 @@ export const translations = {
     // Achievements
     achievements: "Logros",
     achievementsDesc: "Medallas obtenidas por su constancia.",
+    myAchievements: "Mis logros",
+    youHaveEarned: "Has ganado el",
+    ofAllAchievements: "de todos los logros",
+    finishedHabits: "Hábitos terminados",
+    archived: "Archivados",
+    perfectDays: "Días perfectos",
+    finishHabitOnce: "Termina un hábito por primera vez",
+    finishHabit10: "Termina un hábito 10 veces",
+    finishHabit20: "Termina un hábito 20 veces",
+    finishHabit50: "Termina un hábito 50 veces",
+    finishHabit100: "Termina un hábito 100 veces",
+    finishHabit300: "Termina un hábito 300 veces",
+    perfectDay3: "3 días perfectos",
+    perfectDay10: "10 días perfectos",
+    perfectDay20: "20 días perfectos",
     
     // How it works
     howItWorks: "Cómo funciona",
@@ -110,9 +129,9 @@ export const translations = {
     
     // Navigation
     navToday: "Hoy",
-    navJourney: "Recorrido",
+    navJourney: "Viaje",
     navHistory: "Historial",
-    navProfile: "Perfil",
+    navProfile: "Mío",
     
     // Completion modal
     congratulations: "¡Felicitaciones!",
@@ -132,18 +151,65 @@ export const translations = {
     // Habit form
     habitFormTitle: "Nuevo hábito",
     habitFormSubtitle: "¿Qué hábito quieres crear?",
+    habitName: "Nombre de hábito",
+    frequentHabit: "Hábito asiduo",
     habitIcon: "Ícono",
     habitColor: "Color",
-    doIt: "Hacerlo en",
-    dailyGoal: "Meta diaria",
-    advancedSettings: "Configuración avanzada",
+    repeat: "Repetir",
+    habitDays: "Días de hábito",
+    allDays: "Todos los días",
+    specificDaysOfWeek: "Días específicos de la semana",
+    xDaysPerWeek: "X días a la semana",
+    xDaysPerMonth: "X días al mes",
+    xDaysPerYear: "X días al año",
+    longTermHabit: "Hábito a largo plazo",
+    longTermDesc: "Se registrará individualmente en la categoría \"largo plazo\" de tu lista de hábitos.",
+    doIt: "Hacerlo",
+    dailyGoal: "Objetivo diario",
+    objective: "Objetivo",
+    disable: "Desactivar",
+    advancedSettings: "Ajustes avanzados",
     reminderForHabit: "Recordatorio para este hábito",
+    soundEffects: "Efectos de sonido",
+    systemDefault: "Sistema predeterminado",
     incentive: "Incentivo",
-    incentivePlaceholder: "¿Qué te motiva a hacer este hábito?",
+    incentivePlaceholder: "Escribe algo para incentivarte...",
+    endIn: "Terminar en",
+    deactivate: "Desactivar",
+    date: "Fecha",
+    daysOption: "Días",
+    lastDayIs: "El último día es...",
     save: "Guardar",
     typeCheckIn: "Check-in",
     typeCounter: "Contador",
     typeTimer: "Temporizador",
+    
+    // History page
+    history: "Historial",
+    calendar: "Calendario",
+    allHabits: "Todos los hábitos",
+    currentStreak: "Racha actual",
+    habitCompleted: "Hábito terminado",
+    thisWeek: "Esta semana",
+    completionRate: "Índice de completado",
+    habits: "hábitos",
+    
+    // Profile / Settings
+    settings: "Configuración",
+    timePeriods: "Periodos de tiempo",
+    notifications: "Notificación",
+    globalReminders: "Recordatorios globales",
+    morningHabit: "Hábito de mañana",
+    afternoonHabit: "Hábito de tarde",
+    nightHabit: "Hábito de noche",
+    startAt: "Empezar a la(s)",
+    endOfDay: "Final del día",
+    account: "Cuenta",
+    editProfile: "Editar perfil",
+    
+    // Loading states
+    loading: "Cargando...",
+    checkingSession: "Comprobando tu sesión...",
   },
   en: {
     // Header
@@ -200,6 +266,7 @@ export const translations = {
     footerCertification: "ISO 9001:2015 Quality Certification",
     
     // Dashboard
+    today: "TODAY",
     yourHabitsToday: "Your habits today",
     markCheckIns: "Record your daily check-ins and keep your streaks active.",
     goal: "Goal",
@@ -216,8 +283,11 @@ export const translations = {
     edit: "Edit",
     all: "All",
     anytime: "Anytime",
+    anyMoment: "Any moment",
     min: "min",
     reps: "reps",
+    createNewHabit: "Create a new habit",
+    noHabitsYet: "You haven't created any habits yet.",
     
     // Time of day
     morning: "Morning",
@@ -234,6 +304,21 @@ export const translations = {
     // Achievements
     achievements: "Achievements",
     achievementsDesc: "Medals earned for your consistency.",
+    myAchievements: "My achievements",
+    youHaveEarned: "You have earned",
+    ofAllAchievements: "of all achievements",
+    finishedHabits: "Finished habits",
+    archived: "Archived",
+    perfectDays: "Perfect days",
+    finishHabitOnce: "Finish a habit for the first time",
+    finishHabit10: "Finish a habit 10 times",
+    finishHabit20: "Finish a habit 20 times",
+    finishHabit50: "Finish a habit 50 times",
+    finishHabit100: "Finish a habit 100 times",
+    finishHabit300: "Finish a habit 300 times",
+    perfectDay3: "3 perfect days",
+    perfectDay10: "10 perfect days",
+    perfectDay20: "20 perfect days",
     
     // How it works
     howItWorks: "How it works",
@@ -256,7 +341,7 @@ export const translations = {
     navToday: "Today",
     navJourney: "Journey",
     navHistory: "History",
-    navProfile: "Profile",
+    navProfile: "Me",
     
     // Completion modal
     congratulations: "Congratulations!",
@@ -276,18 +361,65 @@ export const translations = {
     // Habit form
     habitFormTitle: "New habit",
     habitFormSubtitle: "What habit do you want to create?",
+    habitName: "Habit name",
+    frequentHabit: "Frequent habit",
     habitIcon: "Icon",
     habitColor: "Color",
-    doIt: "Do it at",
+    repeat: "Repeat",
+    habitDays: "Habit days",
+    allDays: "Every day",
+    specificDaysOfWeek: "Specific days of the week",
+    xDaysPerWeek: "X days per week",
+    xDaysPerMonth: "X days per month",
+    xDaysPerYear: "X days per year",
+    longTermHabit: "Long term habit",
+    longTermDesc: "Will be recorded individually in the \"long term\" category of your habit list.",
+    doIt: "Do it",
     dailyGoal: "Daily goal",
+    objective: "Objective",
+    disable: "Disable",
     advancedSettings: "Advanced settings",
     reminderForHabit: "Reminder for this habit",
+    soundEffects: "Sound effects",
+    systemDefault: "System default",
     incentive: "Incentive",
-    incentivePlaceholder: "What motivates you to do this habit?",
+    incentivePlaceholder: "Write something to motivate yourself...",
+    endIn: "End in",
+    deactivate: "Deactivate",
+    date: "Date",
+    daysOption: "Days",
+    lastDayIs: "The last day is...",
     save: "Save",
     typeCheckIn: "Check-in",
     typeCounter: "Counter",
     typeTimer: "Timer",
+    
+    // History page
+    history: "History",
+    calendar: "Calendar",
+    allHabits: "All habits",
+    currentStreak: "Current streak",
+    habitCompleted: "Habit completed",
+    thisWeek: "This week",
+    completionRate: "Completion rate",
+    habits: "habits",
+    
+    // Profile / Settings
+    settings: "Settings",
+    timePeriods: "Time periods",
+    notifications: "Notification",
+    globalReminders: "Global reminders",
+    morningHabit: "Morning habit",
+    afternoonHabit: "Afternoon habit",
+    nightHabit: "Night habit",
+    startAt: "Start at",
+    endOfDay: "End of day",
+    account: "Account",
+    editProfile: "Edit profile",
+    
+    // Loading states
+    loading: "Loading...",
+    checkingSession: "Checking your session...",
   },
 } as const;
 
