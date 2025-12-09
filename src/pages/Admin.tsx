@@ -13,6 +13,12 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
+import { Logo } from "@/components/layout/Logo";
+import { TopNav } from "@/components/layout/TopNav";
+import { QuickNav } from "@/components/layout/QuickNav";
+import { UserMenu } from "@/components/layout/UserMenu";
+import { LanguageToggle } from "@/components/LanguageToggle";
+import { ModeToggle } from "@/components/mode-toggle";
 import { 
   Activity, 
   BarChart3, 
@@ -70,7 +76,7 @@ const COLORS = ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#06B6D4'
 const Admin = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user, isAdmin, role, signOut, loading: authLoading } = useAuth();
+  const { user, isAdmin, role, signOut, loading: authLoading, refreshRole } = useAuth();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [loading, setLoading] = useState(true);
   const [checkingAccess, setCheckingAccess] = useState(true);
@@ -105,37 +111,96 @@ const Admin = () => {
       
       setCheckingAccess(true);
       
-      // Verificar rol directamente desde la base de datos
-      const { data: roleData, error: roleError } = await supabase
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", user.id)
-        .maybeSingle();
+      // Verificar rol directamente desde la base de datos (fuente de verdad)
+      let userRole: string | null = null;
+      let roleError: any = null;
+      let roleData: any[] | null = null;
       
-      // Usar el rol de la base de datos si está disponible, sino usar el del hook
-      const userRole = roleData?.role || role;
+      // Método 1: Consulta directa (método más confiable)
+      // Comentamos las funciones RPC temporalmente para evitar errores de tipo
       
-      console.log("🔐 Verificación de acceso admin:", {
-        userId: user.id,
-        email: user.email,
-        roleFromDB: roleData?.role,
-        roleFromHook: role,
-        isAdminFromHook: isAdmin,
-        finalRole: userRole,
-        hasRoleError: !!roleError
-      });
-      
-      // Si hay error pero el hook dice que es admin, confiar en el hook
-      if (roleError && (isAdmin || role === "admin")) {
-        console.log("⚠️ Error en DB pero hook confirma admin, permitiendo acceso");
-        setCheckingAccess(false);
-        loadData();
-        return;
+      // Método 2: Consulta directa - obtener todos los roles del usuario
+      if (!userRole) {
+        const { data: rolesFromDB, error: directError } = await supabase
+          .from("user_roles")
+          .select("role")
+          .eq("user_id", user.id);
+        
+        roleData = rolesFromDB || null;
+        
+        console.log("🔐 Consulta de roles:", {
+          userId: user.id,
+          email: user.email,
+          roleData,
+          error: directError,
+          roleDataLength: roleData?.length
+        });
+        
+        if (directError) {
+          console.error("❌ Error al consultar roles:", directError);
+          roleError = directError;
+          
+          // Si el error es de permisos, intentar usar la función has_role
+          if (directError.message?.includes("permission") || directError.message?.includes("RLS")) {
+            console.log("⚠️ Error de permisos detectado, intentando función has_role...");
+            try {
+              const { data: hasAdminRole, error: hasRoleError } = await supabase
+                .rpc("has_role", {
+                  _user_id: user.id,
+                  _role: "admin"
+                });
+              
+              console.log("has_role resultado:", hasAdminRole, "error:", hasRoleError);
+              
+              if (!hasRoleError && hasAdminRole === true) {
+                userRole = "admin";
+                console.log("✅ Rol admin confirmado mediante has_role");
+              }
+            } catch (e: any) {
+              // Silenciar error de tipo si ocurre
+              console.log("⚠️ Error en has_role (ignorado):", e?.message);
+            }
+          }
+        } else if (roleData && roleData.length > 0) {
+          // Si hay múltiples roles, buscar el de admin primero
+          const adminRole = roleData.find(r => r.role === "admin");
+          userRole = adminRole?.role || roleData[0]?.role || null;
+          console.log("✅ Rol encontrado:", userRole, "de", roleData.length, "roles");
+        } else {
+          console.warn("⚠️ No se encontraron roles para el usuario");
+        }
       }
       
-      // Si no hay rol aún y el hook tampoco tiene, esperar un poco
-      if (!userRole && !roleData && !role && !isAdmin) {
-        console.log("⏳ Rol no encontrado, esperando...");
+      console.log("🔐 Verificación de acceso admin - RESUMEN:", {
+        userId: user.id,
+        email: user.email,
+        roleFromDB: userRole,
+        roleData: roleData,
+        roleFromHook: role,
+        isAdminFromHook: isAdmin,
+        hasRoleError: !!roleError,
+        roleErrorDetails: roleError
+      });
+      
+      // Si hay error al consultar, intentar refrescar el rol del hook
+      if (roleError && !userRole) {
+        console.warn("⚠️ Error al consultar rol desde DB:", roleError);
+        // Refrescar el rol del hook como respaldo
+        await refreshRole();
+        // Esperar un momento para que se actualice
+        await new Promise(resolve => setTimeout(resolve, 500));
+        // Verificar el hook actualizado (se actualizará en el siguiente render)
+        if (isAdmin || role === "admin") {
+          console.log("⚠️ Error en DB pero hook confirma admin, permitiendo acceso");
+          setCheckingAccess(false);
+          loadData();
+          return;
+        }
+      }
+      
+      // Si no hay rol en la base de datos, esperar un poco y reintentar
+      if (!userRole && !roleError) {
+        console.log("⏳ Rol no encontrado en DB, esperando...");
         // Esperar un poco y reintentar (máximo 3 intentos)
         const retryCount = (window as any).__adminRetryCount || 0;
         if (retryCount < 3) {
@@ -150,9 +215,13 @@ const Admin = () => {
       // Limpiar contador de reintentos
       (window as any).__adminRetryCount = 0;
       
-      // Verificar si es admin (usar cualquiera de las dos fuentes)
-      if (userRole === "admin" || isAdmin || role === "admin") {
+      // Verificar si es admin (priorizar DB, luego hook como respaldo)
+      if (userRole === "admin" || (!userRole && (isAdmin || role === "admin"))) {
         console.log("✅ Acceso concedido - Usuario es admin");
+        // Si el hook no está actualizado, refrescarlo
+        if (userRole === "admin" && role !== "admin") {
+          await refreshRole();
+        }
         setCheckingAccess(false);
         loadData();
         return;
@@ -160,6 +229,13 @@ const Admin = () => {
       
       // Si no es admin, denegar acceso
       console.log("❌ Acceso denegado - Rol:", userRole || role || "sin asignar");
+      console.log("📊 Detalles completos:", {
+        userRole,
+        roleFromHook: role,
+        isAdminFromHook: isAdmin,
+        roleError,
+        roleData
+      });
       toast({
         title: "Acceso denegado",
         description: `Tu rol actual es: ${userRole || role || "sin asignar"}. Se requieren permisos de administrador.`,
@@ -379,16 +455,37 @@ const Admin = () => {
 
   const handleRoleChange = async (userId: string, newRole: "admin" | "moderator" | "user") => {
     try {
-      const { error } = await supabase
+      // Primero eliminar todos los roles existentes del usuario
+      const { error: deleteError } = await supabase
         .from("user_roles")
-        .upsert({
+        .delete()
+        .eq("user_id", userId);
+
+      if (deleteError) {
+        console.error("Error eliminando roles anteriores:", deleteError);
+        // Continuar de todas formas, puede que no haya roles previos
+      }
+
+      // Luego insertar el nuevo rol
+      const { error: insertError } = await supabase
+        .from("user_roles")
+        .insert({
           user_id: userId,
           role: newRole,
-        }, {
-          onConflict: "user_id,role",
         });
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // Si el usuario actual cambió su propio rol, refrescar el rol en el hook
+      if (userId === user?.id) {
+        await refreshRole();
+        // Si se cambió a admin, recargar la página para aplicar los cambios
+        if (newRole === "admin") {
+          setTimeout(() => {
+            window.location.reload();
+          }, 500);
+        }
+      }
 
       toast({
         title: "Rol actualizado",
@@ -398,6 +495,7 @@ const Admin = () => {
       await loadUsers();
       setSelectedUser(null);
     } catch (error: any) {
+      console.error("Error completo al cambiar rol:", error);
       toast({
         title: "Error",
         description: error.message || "No se pudo actualizar el rol",
@@ -514,43 +612,98 @@ const Admin = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Navbar mejorado */}
-      <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
-        <div className="container flex items-center justify-between py-4">
-          <div className="flex items-center gap-4">
-            <div className="flex flex-col gap-1">
-              <p className="text-xs font-medium tracking-wide text-primary">Panel Administrador</p>
-              <h1 className="text-lg font-semibold sm:text-xl">HabitTrack Admin</h1>
+      {/* Navbar igual al principal */}
+      <header className="sticky top-0 z-40 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 shadow-sm">
+        {/* Top Navigation Bar - Desktop */}
+        <div className="container border-b hidden md:block">
+          <div className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-6">
+              <Logo size="sm" />
+              <TopNav />
             </div>
-            <Badge variant="default" className="text-xs">
-              <Shield className="mr-1 h-3 w-3" />
-              Administrador
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="text-xs">
+                <Shield className="mr-1 h-3 w-3" />
+                Admin
+              </Badge>
+              <LanguageToggle />
+              <ModeToggle />
+              <UserMenu />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Navigation */}
+        <div className="container border-b md:hidden">
+          <div className="flex items-center justify-between py-3">
+            <div className="flex items-center gap-2">
+              <Logo size="sm" />
+              <QuickNav />
+            </div>
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="text-xs">
+                <Shield className="mr-1 h-3 w-3" />
+                Admin
+              </Badge>
+              <LanguageToggle />
+              <ModeToggle />
+              <UserMenu />
+            </div>
+          </div>
+        </div>
+
+        {/* Page Header */}
+        <div className="container flex items-center justify-between py-4">
+          <div className="flex items-center gap-3 flex-1">
+            <div className="flex-1">
+              <h1 className="text-xl md:text-2xl font-bold tracking-tight">Panel Administrador</h1>
+              <p className="text-sm text-muted-foreground">Gestión de usuarios y estadísticas</p>
+            </div>
           </div>
           <div className="flex items-center gap-2">
             <Button
               size="sm"
-              variant="ghost"
-              onClick={() => navigate("/app")}
-            >
-              <Home className="mr-2 h-4 w-4" />
-              Panel Usuario
-            </Button>
-            <Button
-              size="sm"
               variant="outline"
-              onClick={loadData}
+              onClick={async () => {
+                // Debug: verificar rol actual (sin mostrar errores al usuario)
+                try {
+                  console.log("🔍 === DEBUG ROL ===");
+                  console.log("User ID:", user?.id);
+                  const { data: debugRole, error: debugError } = await supabase
+                    .from("user_roles")
+                    .select("role, user_id")
+                    .eq("user_id", user?.id || "");
+                  console.log("Roles desde DB:", debugRole, "Error:", debugError);
+                  
+                  try {
+                    const { data: currentRole, error: currentRoleError } = await supabase.rpc("get_current_user_role", {});
+                    console.log("get_current_user_role():", currentRole, "Error:", currentRoleError);
+                  } catch (e: any) {
+                    console.log("Error en get_current_user_role (ignorado):", e?.message);
+                  }
+                  
+                  try {
+                    const { data: hasAdmin, error: hasAdminError } = await supabase.rpc("has_role", {
+                      _user_id: user?.id || "",
+                      _role: "admin"
+                    });
+                    console.log("has_role('admin'):", hasAdmin, "Error:", hasAdminError);
+                  } catch (e: any) {
+                    console.log("Error en has_role (ignorado):", e?.message);
+                  }
+                  
+                  console.log("Rol del hook:", role);
+                  console.log("isAdmin del hook:", isAdmin);
+                  await refreshRole();
+                  console.log("🔍 === FIN DEBUG ===");
+                } catch (e: any) {
+                  console.error("Error en debug (ignorado):", e?.message);
+                }
+                loadData();
+              }}
             >
               <RefreshCw className="mr-2 h-4 w-4" />
               Actualizar
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={signOut}
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              Salir
             </Button>
           </div>
         </div>

@@ -64,6 +64,12 @@ export const useAuth = () => {
     }
   };
 
+  const refreshRole = async () => {
+    if (user?.id) {
+      await fetchUserRole(user.id);
+    }
+  };
+
   const signOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
@@ -80,5 +86,6 @@ export const useAuth = () => {
     role,
     isAdmin,
     signOut,
+    refreshRole,
   };
 };

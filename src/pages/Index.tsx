@@ -165,13 +165,31 @@ const Index = () => {
       <main className="container flex-1 py-12">
         {/* Hero Section */}
         <section className="mb-16 text-center space-y-6">
-          <div className="space-y-4">
-            <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
-              {t("heroTitle")}
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-              {t("heroSubtitle")}
-            </p>
+          <div className="flex flex-col items-center space-y-6">
+            {/* Título y subtítulo primero */}
+            <div className="space-y-4">
+              <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold tracking-tight">
+                {t("heroTitle")}
+              </h1>
+              <p className="text-lg md:text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+                {t("heroSubtitle")}
+              </p>
+            </div>
+            
+            {/* Logo/Character Image debajo del texto */}
+            <div className="flex justify-center mt-4">
+              <div className="relative">
+                <img 
+                  src="/Egghead-removebg-preview.png" 
+                  alt="HabitTrack Character" 
+                  className="h-48 md:h-64 lg:h-80 w-auto object-contain animate-float"
+                  onError={(e) => {
+                    // Si la imagen no existe, ocultarla
+                    (e.target as HTMLImageElement).style.display = 'none';
+                  }}
+                />
+              </div>
+            </div>
           </div>
           <div className="flex flex-wrap items-center justify-center gap-4 pt-4">
             <Button size="lg" asChild>
