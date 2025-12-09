@@ -467,21 +467,32 @@ const Profile = () => {
         });
 
       if (uploadError) {
-        // Si el bucket no existe, mostrar error pero no bloquear el resto de la funcionalidad
+        console.error("Error al subir avatar:", uploadError);
+        
+        // Mensajes de error más específicos
+        let errorMessage = "No se pudo subir la imagen";
+        
         if (uploadError.message.includes('Bucket not found') || uploadError.message.includes('not found') || uploadError.message.includes('does not exist')) {
-          toast({
-            variant: "destructive",
-            title: "Error de configuración",
-            description: "El bucket de avatares no está configurado. Por favor, crea un bucket llamado 'avatars' en Supabase Storage. Puedes guardar el resto de tu información normalmente.",
-          });
-          setUploadingAvatar(false);
-          event.target.value = '';
-          setAvatarPreview(null);
-          return;
+          errorMessage = "El bucket de avatares no está configurado. Por favor, contacta al administrador.";
+        } else if (uploadError.message.includes('new row violates row-level security policy') || uploadError.message.includes('permission denied') || uploadError.message.includes('RLS')) {
+          errorMessage = "No tienes permisos para subir imágenes. Por favor, asegúrate de estar autenticado correctamente.";
+        } else if (uploadError.message.includes('File size exceeds')) {
+          errorMessage = "La imagen es demasiado grande. Máximo 1 MB.";
+        } else if (uploadError.message.includes('Invalid file type')) {
+          errorMessage = "Tipo de archivo no válido. Solo se permiten imágenes (JPG, PNG, GIF, WEBP).";
         } else {
-          console.error("Error al subir avatar:", uploadError);
-          throw uploadError;
+          errorMessage = uploadError.message || "Error al subir la imagen. Por favor, intenta nuevamente.";
         }
+        
+        toast({
+          variant: "destructive",
+          title: "Error al subir avatar",
+          description: errorMessage,
+        });
+        setUploadingAvatar(false);
+        event.target.value = '';
+        setAvatarPreview(null);
+        return;
       }
 
       // Obtener URL pública

@@ -16,6 +16,7 @@ import { LanguageToggle } from "@/components/LanguageToggle";
 import { Footer } from "@/components/Footer";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Shield, Eye, EyeOff, Mail, Lock, CheckCircle2, XCircle, AlertCircle } from "lucide-react";
+import { getEmailConfirmationUrl, getPasswordResetUrl } from "@/lib/auth-utils";
 
 const LoginSchema = z.object({
   email: z
@@ -303,7 +304,7 @@ const Auth = () => {
     setLoading(true);
 
     try {
-      const redirectUrl = `${window.location.origin}/`;
+      const redirectUrl = getEmailConfirmationUrl();
       const { data, error } = await supabase.auth.signUp({
         email: values.email,
         password: values.password,
@@ -311,6 +312,8 @@ const Auth = () => {
           emailRedirectTo: redirectUrl,
           data: {
             full_name: `${values.firstName} ${values.lastName}`.trim(),
+            first_name: values.firstName.trim(),
+            last_name: values.lastName.trim(),
           },
         },
       });
@@ -479,7 +482,7 @@ const Auth = () => {
 
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(values.email, {
-        redirectTo: `${window.location.origin}/auth?mode=reset`,
+        redirectTo: getPasswordResetUrl(),
       });
 
       if (error) {

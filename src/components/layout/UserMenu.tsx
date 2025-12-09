@@ -29,11 +29,17 @@ export const UserMenu = () => {
       }
 
       try {
-        const { data } = await supabase
+        const { data, error } = await supabase
           .from("profiles")
           .select("full_name, avatar_url")
           .eq("id", user.id)
-          .single();
+          .maybeSingle();
+
+        if (error) {
+          console.error("Error fetching profile:", error);
+          setFullName(authFullName || user.email?.split("@")[0] || "Usuario");
+          return;
+        }
 
         if (data?.full_name) {
           setFullName(data.full_name);

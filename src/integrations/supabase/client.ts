@@ -13,5 +13,12 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
-  }
+  },
+  global: {
+    headers: {
+      'Accept': 'application/json',
+      // No establecer Content-Type aquí porque interfiere con la carga de archivos
+      // Supabase detecta automáticamente el Content-Type según el tipo de operación
+    },
+  },
 });

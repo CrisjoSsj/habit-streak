@@ -17,6 +17,7 @@ import { HabitFormDialog } from "@/components/habits/HabitFormDialog";
 import { CompletionModal } from "@/components/habits/CompletionModal";
 import { getHabitIcon } from "@/lib/habitIcons";
 import { hexToRgba } from "@/lib/utils";
+import { getTodayForSupabase, isTodayInUserTimezone, parseDateFromSupabase, getTodayInUserTimezone } from "@/lib/date-utils";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Habit = Tables<"habits">;
@@ -195,12 +196,11 @@ const Dashboard = () => {
   ) => {
     if (!userId) return;
     
-    // Solo permitir check-in en el día actual
-    const today = new Date();
-    const todayStr = format(today, "yyyy-MM-dd");
+    // Solo permitir check-in en el día actual (en la zona horaria del usuario)
+    const todayStr = getTodayForSupabase();
     const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
     
-    if (selectedDateStr !== todayStr) {
+    if (!isTodayInUserTimezone(selectedDate)) {
       toast({
         variant: "destructive",
         title: t("onlyTodayCheckIn"),
@@ -209,7 +209,7 @@ const Dashboard = () => {
       return;
     }
     
-    const dateStr = format(selectedDate, "yyyy-MM-dd");
+    const dateStr = todayStr; // Usar la fecha de hoy en formato Supabase
     
     // Buscar completión existente para esta fecha (no solo del día seleccionado)
     const existing = completions.find(
