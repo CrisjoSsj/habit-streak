@@ -1,6 +1,6 @@
 import { useLanguage } from "@/contexts/LanguageContext";
 import { Separator } from "@/components/ui/separator";
-import { Shield, Award } from "lucide-react";
+import { Shield } from "lucide-react";
 
 export const Footer = () => {
   const { t } = useLanguage();
@@ -19,10 +19,6 @@ export const Footer = () => {
             <p className="text-sm text-muted-foreground">
               {t("footerDescription")}
             </p>
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <Award className="h-4 w-4 text-primary" />
-              <span>{t("footerCertification")}</span>
-            </div>
           </div>
 
           {/* Links */}
@@ -81,10 +77,6 @@ export const Footer = () => {
 
         <div className="flex flex-col items-center justify-between gap-4 text-xs text-muted-foreground sm:flex-row">
           <p>© {currentYear} HabitTrack. {t("footerRights")}</p>
-          <div className="flex items-center gap-2">
-            <Shield className="h-3 w-3" />
-            <span>ISO 9001:2015</span>
-          </div>
         </div>
       </div>
     </footer>

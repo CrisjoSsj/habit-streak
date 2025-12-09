@@ -76,37 +76,46 @@ export type Database = {
           completion_date: string
           count_progress: number | null
           created_at: string
-          habit_id: string
+          habit_id: string | null
           id: string
           is_completed: boolean | null
           is_rest_day: boolean | null
           timer_seconds: number | null
           updated_at: string
           user_id: string
+          deleted_habit_name: string | null
+          deleted_habit_icon: string | null
+          deleted_habit_color: string | null
         }
         Insert: {
           completion_date?: string
           count_progress?: number | null
           created_at?: string
-          habit_id: string
+          habit_id?: string | null
           id?: string
           is_completed?: boolean | null
           is_rest_day?: boolean | null
           timer_seconds?: number | null
           updated_at?: string
           user_id: string
+          deleted_habit_name?: string | null
+          deleted_habit_icon?: string | null
+          deleted_habit_color?: string | null
         }
         Update: {
           completion_date?: string
           count_progress?: number | null
           created_at?: string
-          habit_id?: string
+          habit_id?: string | null
           id?: string
           is_completed?: boolean | null
           is_rest_day?: boolean | null
           timer_seconds?: number | null
           updated_at?: string
           user_id?: string
+          deleted_habit_name?: string | null
+          deleted_habit_icon?: string | null
+          deleted_habit_color?: string | null
         }
         Relationships: [
           {

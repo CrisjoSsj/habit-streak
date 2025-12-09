@@ -52,14 +52,15 @@ export const useAuth = () => {
 
       if (error) {
         console.error("Error fetching user role:", error);
-        setRole("user");
+        // No establecer rol por defecto, dejar null para que se pueda verificar después
+        setRole(null);
         return;
       }
 
       setRole(data?.role ?? "user");
     } catch (err) {
       console.error("Error fetching role:", err);
-      setRole("user");
+      setRole(null);
     }
   };
 

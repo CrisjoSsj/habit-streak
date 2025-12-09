@@ -19,7 +19,7 @@ export const WeekCalendar = ({ selectedDate, onSelectDate }: WeekCalendarProps) 
   }, [selectedDate]);
 
   return (
-    <div className="flex items-center justify-between gap-1 py-4">
+    <div className="flex items-center justify-center gap-1.5 py-4 lg:gap-2">
       {weekDays.map((day) => {
         const isSelected = isSameDay(day, selectedDate);
         const isTodayDate = isToday(day);
@@ -29,18 +29,21 @@ export const WeekCalendar = ({ selectedDate, onSelectDate }: WeekCalendarProps) 
             key={day.toISOString()}
             onClick={() => onSelectDate(day)}
             className={cn(
-              "flex flex-col items-center gap-1 rounded-lg px-3 py-2 transition-colors min-w-[40px]",
+              "flex flex-col items-center gap-1 rounded-lg px-3 py-2 transition-all min-w-[45px] lg:min-w-[50px]",
               isSelected
-                ? "bg-primary text-primary-foreground"
+                ? "bg-primary text-primary-foreground shadow-md"
                 : isTodayDate
-                ? "bg-muted"
+                ? "bg-muted hover:bg-muted/80"
                 : "hover:bg-muted/50"
             )}
           >
-            <span className="text-[10px] font-medium uppercase">
+            <span className="text-[10px] font-medium uppercase tracking-wide">
               {format(day, "EEE", { locale }).slice(0, 3)}
             </span>
-            <span className={cn("text-lg font-semibold", isSelected && "text-primary-foreground")}>
+            <span className={cn(
+              "text-base font-semibold",
+              isSelected && "text-primary-foreground"
+            )}>
               {format(day, "d")}
             </span>
             {isSelected && (

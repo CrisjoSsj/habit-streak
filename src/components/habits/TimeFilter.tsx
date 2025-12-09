@@ -20,7 +20,7 @@ export const TimeFilter = ({ selected, onSelect }: TimeFilterProps) => {
   ];
 
   return (
-    <div className="flex gap-2 overflow-x-auto pb-2">
+    <div className="flex items-center justify-center gap-2 overflow-x-auto pb-2 scrollbar-hide">
       {filters.map((filter) => (
         <button
           key={filter.id}
@@ -28,7 +28,7 @@ export const TimeFilter = ({ selected, onSelect }: TimeFilterProps) => {
           className={cn(
             "flex items-center gap-1.5 whitespace-nowrap rounded-full px-4 py-2 text-sm font-medium transition-colors",
             selected === filter.id
-              ? "bg-primary text-primary-foreground"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "bg-muted/50 text-muted-foreground hover:bg-muted"
           )}
         >
