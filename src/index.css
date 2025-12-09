@@ -182,3 +182,15 @@ All colors MUST be HSL.
     }
   }
 }
+
+/* Ocultar cualquier elemento de Lovable */
+[data-lovable],
+[class*="lovable"],
+[id*="lovable"],
+iframe[src*="lovable"],
+a[href*="lovable"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+}
