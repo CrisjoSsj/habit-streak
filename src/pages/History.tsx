@@ -15,6 +15,8 @@ import { BottomNav } from "@/components/layout/BottomNav";
 import { AchievementBadge } from "@/components/habits/AchievementBadge";
 import { getHabitIcon } from "@/lib/habitIcons";
 import type { Tables } from "@/integrations/supabase/types";
+import { ACHIEVEMENT_DEFINITIONS, getAchievementProgress, getColorValue, getGradientStyle, LEVEL_COLORS } from "@/lib/achievements-config";
+import { Progress } from "@/components/ui/progress";
 
 type Habit = Tables<"habits">;
 type HabitCompletion = Tables<"habit_completions">;
@@ -193,54 +195,259 @@ const History = () => {
     return completedHabitsCount >= activeHabits.length;
   };
 
-  // Tipos de logros basados en la base de datos real
-  const achievementTypes = [
-    { 
-      type: "first_completion", 
-      level: 1, 
-      label: t("finishHabitOnce"), 
-      unlocked: achievements.some((a) => a.achievement_type === "first_completion"),
-      Icon: Target
-    },
-    { 
-      type: "streak_3_days", 
-      level: 3, 
-      label: "Racha de 3 días", 
-      unlocked: achievements.some((a) => a.achievement_type === "streak_3_days"),
-      Icon: Flame
-    },
-    { 
-      type: "streak_7_days", 
-      level: 7, 
-      label: "Racha de 7 días", 
-      unlocked: achievements.some((a) => a.achievement_type === "streak_7_days"),
-      Icon: Zap
-    },
-    { 
-      type: "streak_30_days", 
-      level: 30, 
-      label: "Racha de 30 días", 
-      unlocked: achievements.some((a) => a.achievement_type === "streak_30_days"),
-      Icon: Gem
-    },
-    { 
-      type: "perfect_day", 
-      level: 1, 
-      label: t("perfectDay3"), 
-      unlocked: achievements.some((a) => a.achievement_type === "perfect_day"),
-      Icon: Star
-    },
-    { 
-      type: "perfect_week", 
-      level: 7, 
-      label: "Semana perfecta", 
-      unlocked: achievements.some((a) => a.achievement_type === "perfect_week"),
-      Icon: Sparkles
-    },
-  ];
+  // Calcular valores actuales para cada tipo de logro
+  const currentStreak = stats?.bestStreak || 0; // Mejor racha del usuario
+  
+  const perfectDaysCount = useMemo(() => {
+    const activeHabits = habits.filter(h => !h.is_archived);
+    if (activeHabits.length === 0) return 0;
+    
+    const perfectDays = new Set<string>();
+    const dates = new Set(completions.map(c => c.completion_date));
+    
+    for (const dateStr of dates) {
+      const dayCompletions = completions.filter(
+        c => c.completion_date === dateStr && c.is_completed
+      );
+      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
+      
+      if (completedHabitsCount >= activeHabits.length) {
+        perfectDays.add(dateStr);
+      }
+    }
+    
+    return perfectDays.size;
+  }, [completions, habits]);
 
-  const unlockedCount = achievements.length;
-  const totalAchievements = achievementTypes.length;
+  // Calcular semanas perfectas
+  const perfectWeeksCount = useMemo(() => {
+    const activeHabits = habits.filter(h => !h.is_archived);
+    if (activeHabits.length === 0) return 0;
+    
+    const perfectDays = new Set<string>();
+    const dates = new Set(completions.map(c => c.completion_date));
+    
+    for (const dateStr of dates) {
+      const dayCompletions = completions.filter(
+        c => c.completion_date === dateStr && c.is_completed
+      );
+      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
+      
+      if (completedHabitsCount >= activeHabits.length) {
+        perfectDays.add(dateStr);
+      }
+    }
+    
+    // Agrupar por semana
+    const weeks = new Map<string, Set<string>>();
+    for (const dateStr of perfectDays) {
+      const date = parseISO(dateStr);
+      const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+      const weekKey = format(weekStart, "yyyy-MM-dd");
+      
+      if (!weeks.has(weekKey)) {
+        weeks.set(weekKey, new Set());
+      }
+      weeks.get(weekKey)!.add(dateStr);
+    }
+    
+    // Contar semanas con 7 días perfectos
+    let perfectWeeks = 0;
+    for (const [_, days] of weeks) {
+      if (days.size >= 7) {
+        perfectWeeks++;
+      }
+    }
+    
+    return perfectWeeks;
+  }, [completions, habits]);
+
+  // Calcular valores adicionales para los nuevos logros
+  const totalCompletions = useMemo(() => {
+    return completions.filter(c => c.is_completed).length;
+  }, [completions]);
+
+  const habitsCreated = useMemo(() => {
+    return habits.length;
+  }, [habits]);
+
+  const activeHabitsCount = useMemo(() => {
+    return habits.filter(h => !h.is_archived).length;
+  }, [habits]);
+
+  const perfectMonthsCount = useMemo(() => {
+    const activeHabits = habits.filter(h => !h.is_archived);
+    if (activeHabits.length === 0) return 0;
+    
+    const perfectDays = new Set<string>();
+    const dates = new Set(completions.map(c => c.completion_date));
+    
+    for (const dateStr of dates) {
+      const dayCompletions = completions.filter(
+        c => c.completion_date === dateStr && c.is_completed
+      );
+      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
+      
+      if (completedHabitsCount >= activeHabits.length) {
+        perfectDays.add(dateStr);
+      }
+    }
+    
+    // Agrupar por mes
+    const months = new Map<string, Set<string>>();
+    for (const dateStr of perfectDays) {
+      const date = parseISO(dateStr);
+      const monthKey = format(date, "yyyy-MM");
+      
+      if (!months.has(monthKey)) {
+        months.set(monthKey, new Set());
+      }
+      months.get(monthKey)!.add(dateStr);
+    }
+    
+    // Contar meses con al menos 28 días perfectos (mes completo)
+    let perfectMonths = 0;
+    for (const [_, days] of months) {
+      if (days.size >= 28) {
+        perfectMonths++;
+      }
+    }
+    
+    return perfectMonths;
+  }, [completions, habits]);
+
+  const noMissStreak = useMemo(() => {
+    const activeHabits = habits.filter(h => !h.is_archived);
+    if (activeHabits.length === 0) return 0;
+    
+    // Encontrar la racha más larga sin faltar ningún día
+    const dates = Array.from(new Set(completions.map(c => c.completion_date)))
+      .sort()
+      .reverse();
+    
+    let maxStreak = 0;
+    let currentStreak = 0;
+    
+    for (let i = 0; i < dates.length; i++) {
+      const dateStr = dates[i];
+      const dayCompletions = completions.filter(
+        c => c.completion_date === dateStr && c.is_completed
+      );
+      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
+      
+      if (completedHabitsCount >= activeHabits.length) {
+        currentStreak++;
+        maxStreak = Math.max(maxStreak, currentStreak);
+      } else {
+        currentStreak = 0;
+      }
+    }
+    
+    return maxStreak;
+  }, [completions, habits]);
+
+  const timeVarietyCount = useMemo(() => {
+    const timeSlots = new Set<string>();
+    habits.forEach(habit => {
+      if (habit.time_of_day && habit.time_of_day !== 'anytime') {
+        timeSlots.add(habit.time_of_day);
+      }
+    });
+    return timeSlots.size;
+  }, [habits]);
+
+  const weekendCompletions = useMemo(() => {
+    const weekends = new Set<string>();
+    completions.forEach(c => {
+      if (c.is_completed) {
+        const date = parseISO(c.completion_date);
+        const dayOfWeek = date.getDay();
+        if (dayOfWeek === 0 || dayOfWeek === 6) { // Domingo o Sábado
+          const weekStart = startOfWeek(date, { weekStartsOn: 1 });
+          const weekKey = format(weekStart, "yyyy-MM-dd");
+          weekends.add(weekKey);
+        }
+      }
+    });
+    return weekends.size;
+  }, [completions]);
+
+  const morningCompletions = useMemo(() => {
+    const morningHabits = habits.filter(h => h.time_of_day === 'morning');
+    if (morningHabits.length === 0) return 0;
+    
+    const morningDays = new Set<string>();
+    completions.forEach(c => {
+      if (c.is_completed && morningHabits.some(h => h.id === c.habit_id)) {
+        morningDays.add(c.completion_date);
+      }
+    });
+    return morningDays.size;
+  }, [completions, habits]);
+
+  // Crear estructura de logros con niveles y progreso
+  const achievementTypesWithProgress = useMemo(() => {
+    if (!achievements || achievements.length === 0) {
+      return ACHIEVEMENT_DEFINITIONS.map((def) => ({
+        ...def,
+        currentValue: 0,
+        progress: { currentLevel: null, nextLevel: def.levels[0] || null, progress: 0 },
+        highestUnlockedLevel: 0,
+        maxLevel: Math.max(...def.levels.map(l => l.level)),
+        hasAnyLevel: false,
+      }));
+    }
+
+    return ACHIEVEMENT_DEFINITIONS.map((def) => {
+      let currentValue = 0;
+      
+      if (def.type === "first_completion") {
+        currentValue = achievements.some((a) => a.achievement_type === "first_completion") ? 1 : 0;
+      } else if (def.type === "streak") {
+        currentValue = currentStreak || 0;
+      } else if (def.type === "perfect_day") {
+        currentValue = perfectDaysCount || 0;
+      } else if (def.type === "perfect_week") {
+        currentValue = perfectWeeksCount || 0;
+      } else if (def.type === "total_completions") {
+        currentValue = totalCompletions || 0;
+      } else if (def.type === "habits_created") {
+        currentValue = habitsCreated || 0;
+      } else if (def.type === "perfect_month") {
+        currentValue = perfectMonthsCount || 0;
+      } else if (def.type === "no_miss_streak") {
+        currentValue = noMissStreak || 0;
+      } else if (def.type === "active_habits") {
+        currentValue = activeHabitsCount || 0;
+      } else if (def.type === "time_variety") {
+        currentValue = timeVarietyCount || 0;
+      } else if (def.type === "weekend_warrior") {
+        currentValue = weekendCompletions || 0;
+      } else if (def.type === "early_bird") {
+        currentValue = morningCompletions || 0;
+      }
+      
+      const progress = getAchievementProgress(def.type, currentValue);
+      const maxLevel = Math.max(...def.levels.map(l => l.level));
+      const highestUnlockedLevel = achievements
+        .filter(a => a.achievement_type === def.type)
+        .map(a => a.achievement_level || 0)
+        .reduce((max, level) => Math.max(max, level), 0);
+      
+      return {
+        ...def,
+        currentValue,
+        progress,
+        highestUnlockedLevel,
+        maxLevel,
+        hasAnyLevel: highestUnlockedLevel > 0,
+      };
+    });
+  }, [achievements, currentStreak, perfectDaysCount, perfectWeeksCount, totalCompletions, habitsCreated, perfectMonthsCount, noMissStreak, activeHabitsCount, timeVarietyCount, weekendCompletions, morningCompletions]);
+
+  // Contar tipos únicos de logros desbloqueados (al menos un nivel)
+  const unlockedCount = achievementTypesWithProgress.filter(a => a.hasAnyLevel).length;
+  const totalAchievements = ACHIEVEMENT_DEFINITIONS.length;
   const achievementPercent = totalAchievements > 0 ? Math.round((unlockedCount / totalAchievements) * 100) : 0;
 
 
@@ -585,47 +792,108 @@ const History = () => {
             </Card>
 
             {/* Achievements Grid */}
-            <div className="grid grid-cols-2 lg:grid-cols-3 gap-4">
-              {achievementTypes.map((achievement) => {
-                const AchievementIcon = achievement.Icon;
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {achievementTypesWithProgress && achievementTypesWithProgress.length > 0 ? (
+                achievementTypesWithProgress.map((achievement) => {
+                const AchievementIcon = achievement.icon;
+                const currentLevel = achievement.progress?.currentLevel || null;
+                const nextLevel = achievement.progress?.nextLevel || null;
+                const isUnlocked = achievement.hasAnyLevel || false;
+                const isMaxLevel = currentLevel ? currentLevel.level === achievement.maxLevel : false;
+              
+                // Usar colores unificados según el nivel
+                const levelColor = currentLevel 
+                  ? LEVEL_COLORS[currentLevel.level]
+                  : nextLevel 
+                  ? LEVEL_COLORS[nextLevel.level]
+                  : null;
+
                 return (
                   <Card 
-                      key={achievement.type}
-                    className={achievement.unlocked ? "border-primary border-2" : ""}
+                    key={achievement.type}
+                    className={isUnlocked ? "border-2" : "border"}
+                    style={levelColor ? {
+                      borderColor: levelColor.solid,
+                      opacity: currentLevel ? 1 : 0.5
+                    } : {}}
                   >
                     <CardContent className="p-4">
-                      <div className="flex flex-col items-center gap-3 text-center">
-                        <div
-                          className={`relative flex h-20 w-20 items-center justify-center rounded-full ${
-                            achievement.unlocked
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted text-muted-foreground"
-                          }`}
-                        >
-                          <AchievementIcon className="h-10 w-10" />
-                          {achievement.unlocked && (
-                            <div className="absolute -top-1 -right-1">
-                              <Sparkles className="h-5 w-5 text-primary-foreground" />
+                      <div className="flex flex-col gap-3">
+                        {/* Header con icono y nivel */}
+                        <div className="flex items-center gap-3">
+                          <div
+                            className="relative flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-white"
+                            style={{
+                              background: levelColor
+                                ? levelColor.gradient
+                                : undefined,
+                              opacity: currentLevel ? 1 : nextLevel ? 0.5 : 1,
+                              backgroundColor: !levelColor ? 'hsl(var(--muted))' : undefined,
+                              color: levelColor ? 'white' : 'hsl(var(--muted-foreground))'
+                            }}
+                          >
+                            <AchievementIcon className="h-8 w-8" />
+                            {isUnlocked && (
+                              <div className="absolute -top-1 -right-1">
+                                <Sparkles className="h-4 w-4 text-white" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-sm font-semibold ${
+                              isUnlocked ? "text-foreground" : "text-muted-foreground"
+                            }`}>
+                              {achievement.name}
+                            </p>
+                            {currentLevel && (
+                              <p className="text-xs text-muted-foreground">
+                                Nivel {currentLevel.level}: {currentLevel.label}
+                              </p>
+                            )}
+                            {!currentLevel && nextLevel && (
+                              <p className="text-xs text-muted-foreground">
+                                Siguiente: {nextLevel.label}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        
+                        {/* Descripción */}
+                        <p className="text-xs text-muted-foreground">
+                          {achievement.description}
+                        </p>
+                        
+                        {/* Barra de progreso - Solo mostrar una vez */}
+                        {isMaxLevel ? (
+                          <Badge className="w-fit mx-auto bg-gradient-to-r from-purple-500 to-pink-600 text-white">
+                            Máximo nivel alcanzado
+                          </Badge>
+                        ) : nextLevel && achievement.progress ? (
+                          <div className="space-y-1">
+                            <div className="flex justify-between text-xs">
+                              <span className="text-muted-foreground">
+                                {achievement.currentValue || 0} / {nextLevel.requirement}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {Math.round(achievement.progress.progress || 0)}%
+                              </span>
                             </div>
-                          )}
-                        </div>
-                        <div>
-                          <p className={`text-sm font-medium ${
-                            achievement.unlocked ? "text-foreground" : "text-muted-foreground"
-                          }`}>
-                            {achievement.label}
-                          </p>
-                          {achievement.unlocked && (
-                            <Badge className="mt-1 bg-primary text-primary-foreground">
-                              Desbloqueado
-                            </Badge>
-                          )}
-                        </div>
-                </div>
-              </CardContent>
-            </Card>
+                            <Progress value={Math.min(100, Math.max(0, achievement.progress.progress || 0))} className="h-2" />
+                            <p className="text-xs text-muted-foreground text-center">
+                              {Math.max(0, nextLevel.requirement - (achievement.currentValue || 0))} más para {nextLevel.label}
+                            </p>
+                          </div>
+                        ) : null}
+                      </div>
+                    </CardContent>
+                  </Card>
                 );
-              })}
+              })
+              ) : (
+                <div className="col-span-full text-center py-8 text-muted-foreground">
+                  <p>Cargando logros...</p>
+                </div>
+              )}
             </div>
 
             {/* Logros recientes */}
@@ -640,8 +908,10 @@ const History = () => {
               <CardContent>
                   <div className="space-y-2">
                     {achievements.slice(0, 5).map((achievement) => {
-                      const achievementInfo = achievementTypes.find(a => a.type === achievement.achievement_type);
-                      const AchievementIcon = achievementInfo?.Icon || Trophy;
+                      const achievementInfo = ACHIEVEMENT_DEFINITIONS.find(a => a.type === achievement.achievement_type);
+                      const AchievementIcon = achievementInfo?.icon || Trophy;
+                      const levelInfo = achievementInfo?.levels.find(l => l.level === achievement.achievement_level);
+                      const displayLabel = levelInfo?.label || achievementInfo?.name || achievement.achievement_type;
                       return (
                         <div
                           key={achievement.id}
@@ -651,7 +921,7 @@ const History = () => {
                             <AchievementIcon className="h-5 w-5" />
                           </div>
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{achievementInfo?.label || achievement.achievement_type}</p>
+                            <p className="font-medium text-sm">{displayLabel}</p>
                             <p className="text-xs text-muted-foreground">
                               {format(parseISO(achievement.unlocked_at), "d 'de' MMMM, yyyy", { locale })}
                             </p>

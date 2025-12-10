@@ -117,7 +117,7 @@ export const translations = {
     finishHabit50: "Termina un hábito 50 veces",
     finishHabit100: "Termina un hábito 100 veces",
     finishHabit300: "Termina un hábito 300 veces",
-    perfectDay3: "3 días perfectos",
+    perfectDay3: "Día perfecto",
     perfectDay10: "10 días perfectos",
     perfectDay20: "20 días perfectos",
     
@@ -413,7 +413,7 @@ export const translations = {
     finishHabit50: "Finish a habit 50 times",
     finishHabit100: "Finish a habit 100 times",
     finishHabit300: "Finish a habit 300 times",
-    perfectDay3: "3 perfect days",
+    perfectDay3: "Perfect day",
     perfectDay10: "10 perfect days",
     perfectDay20: "20 perfect days",
     
