@@ -349,6 +349,9 @@ const Auth = () => {
           // Esperar un momento para que el trigger cree el perfil básico
           await new Promise(resolve => setTimeout(resolve, 500));
           
+          // Obtener la zona horaria del navegador
+          const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+          
           // Actualizar el perfil con los datos adicionales del formulario
           const { error: profileError } = await supabase.from("profiles").update({
             first_name: values.firstName.trim() || null,
@@ -356,6 +359,7 @@ const Auth = () => {
             full_name: `${values.firstName} ${values.lastName}`.trim(),
             phone: values.phone.trim() || null,
             age: values.age || null,
+            timezone: userTimezone,
           }).eq("id", data.user.id);
 
           if (profileError) {
@@ -370,6 +374,9 @@ const Auth = () => {
             // Si el perfil no existe aún (puede pasar si el trigger falla), intentar crearlo
             if (profileError.code === "PGRST116" || profileError.message.includes("No rows")) {
               // Intentar crear el perfil manualmente usando upsert
+              // Obtener la zona horaria del navegador
+              const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+              
               const { error: createError } = await supabase.from("profiles").upsert({
                 id: data.user.id,
                 first_name: values.firstName.trim() || null,
@@ -377,6 +384,7 @@ const Auth = () => {
                 full_name: `${values.firstName} ${values.lastName}`.trim(),
                 phone: values.phone.trim() || null,
                 age: values.age || null,
+                timezone: userTimezone,
               }, {
                 onConflict: 'id'
               });
@@ -517,7 +525,7 @@ const Auth = () => {
         email: email,
         options: {
           shouldCreateUser: false,
-          emailRedirectTo: `${window.location.origin}/`,
+          emailRedirectTo: getEmailConfirmationUrl(),
         },
       });
 

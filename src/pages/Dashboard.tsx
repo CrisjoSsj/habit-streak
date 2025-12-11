@@ -32,7 +32,7 @@ const Dashboard = () => {
 
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedDate, setSelectedDate] = useState(getTodayInUserTimezone());
   const [timeFilter, setTimeFilter] = useState<TimeOfDayFilter>("all");
   const [habits, setHabits] = useState<Habit[]>([]);
   const [completions, setCompletions] = useState<HabitCompletion[]>([]);
@@ -504,7 +504,8 @@ const Dashboard = () => {
     if (habit.created_at) {
       const habitCreatedDate = parseISO(habit.created_at);
       habitCreatedDate.setHours(0, 0, 0, 0);
-      const selectedDate = new Date(date);
+      // Asegurar que la fecha seleccionada use la zona horaria local
+      const selectedDate = parseDateFromSupabase(format(date, "yyyy-MM-dd"));
       selectedDate.setHours(0, 0, 0, 0);
       
       // Si la fecha seleccionada es anterior a la creación del hábito, no mostrar

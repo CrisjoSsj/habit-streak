@@ -17,22 +17,47 @@ export const getUserTimezone = (): string => {
 
 /**
  * Obtiene la fecha actual en la zona horaria del usuario (sin horas/minutos/segundos)
- * Esto representa "hoy" según la zona horaria del usuario
+ * Esto representa "hoy" según la zona horaria del navegador/dispositivo
  */
 export const getTodayInUserTimezone = (): Date => {
+  // Usar Intl.DateTimeFormat para obtener la fecha actual en la zona horaria del navegador
   const now = new Date();
-  // Crear una fecha local sin hora (solo día)
-  const localDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const timeZone = getUserTimezone();
+  
+  // Obtener los componentes de fecha en la zona horaria local del usuario
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  const parts = formatter.formatToParts(now);
+  const year = parseInt(parts.find(p => p.type === 'year')?.value || '0', 10);
+  const month = parseInt(parts.find(p => p.type === 'month')?.value || '0', 10) - 1;
+  const day = parseInt(parts.find(p => p.type === 'day')?.value || '0', 10);
+  
+  // Crear fecha local sin hora (solo día) en la zona horaria del usuario
+  const localDate = new Date(year, month, day);
   return startOfDay(localDate);
 };
 
 /**
  * Formatea una fecha para almacenar en Supabase (formato yyyy-MM-dd)
- * Usa la fecha local del usuario, que se interpretará correctamente en Supabase
+ * Usa la fecha local del usuario según su zona horaria del navegador
  */
 export const formatDateForSupabase = (date: Date): string => {
-  // Usar la fecha local directamente, ya que trabajamos solo con días
-  return format(date, 'yyyy-MM-dd');
+  // Asegurar que usamos la fecha en la zona horaria local del usuario
+  const timeZone = getUserTimezone();
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  // 'en-CA' devuelve formato yyyy-MM-dd directamente
+  return formatter.format(date);
 };
 
 /**
@@ -65,4 +90,34 @@ export const isTodayInUserTimezone = (date: Date | string): boolean => {
 export const getTodayForSupabase = (): string => {
   const today = getTodayInUserTimezone();
   return formatDateForSupabase(today);
+};
+
+/**
+ * Obtiene la fecha y hora actual en la zona horaria del usuario
+ * Útil para mostrar información de sincronización
+ */
+export const getCurrentDateTime = (): { date: string; time: string; timezone: string } => {
+  const now = new Date();
+  const timeZone = getUserTimezone();
+  
+  const dateFormatter = new Intl.DateTimeFormat('es-ES', {
+    timeZone: timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  });
+  
+  const timeFormatter = new Intl.DateTimeFormat('es-ES', {
+    timeZone: timeZone,
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false
+  });
+  
+  return {
+    date: dateFormatter.format(now),
+    time: timeFormatter.format(now),
+    timezone: timeZone
+  };
 };
