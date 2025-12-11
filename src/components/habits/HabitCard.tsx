@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Check, MoreHorizontal, Coffee, Pause, Play, RotateCcw, Trash2 } from "lucide-react";
+import { Check, MoreHorizontal, Coffee, Pause, Play, RotateCcw, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,7 +42,7 @@ interface HabitCardProps {
   onResetTimer: () => void;
   onRestDay: () => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onArchive: () => void;
   isToday?: boolean;
   periodProgress?: { current: number; goal: number; periodLabel: string } | null;
 }
@@ -64,7 +64,7 @@ export const HabitCard = ({
   onResetTimer,
   onRestDay,
   onEdit,
-  onDelete,
+  onArchive,
   isToday = true,
   periodProgress,
 }: HabitCardProps) => {
@@ -165,26 +165,26 @@ export const HabitCard = ({
                   <AlertDialogTrigger asChild>
                     <DropdownMenuItem 
                       onSelect={(e) => e.preventDefault()}
-                      className="text-destructive focus:text-destructive"
+                      className="text-muted-foreground focus:text-muted-foreground"
                     >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {t("delete")}
+                      <Archive className="mr-2 h-4 w-4" />
+                      Archivar
                     </DropdownMenuItem>
                   </AlertDialogTrigger>
                   <AlertDialogContent>
                     <AlertDialogHeader>
-                      <AlertDialogTitle>{t("deleteHabit")}</AlertDialogTitle>
+                      <AlertDialogTitle>Archivar Hábito</AlertDialogTitle>
                       <AlertDialogDescription>
-                        {t("deleteHabitDescription")}
+                        El hábito se ocultará de tu lista activa pero permanecerá en tu historial. Podrás reactivarlo más tarde desde la sección de hábitos archivados.
                       </AlertDialogDescription>
                     </AlertDialogHeader>
                     <AlertDialogFooter>
                       <AlertDialogCancel>{t("cancel")}</AlertDialogCancel>
                       <AlertDialogAction
-                        onClick={onDelete}
-                        className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                        onClick={onArchive}
+                        className="bg-muted text-muted-foreground hover:bg-muted/90"
                       >
-                        {t("delete")}
+                        Archivar
                       </AlertDialogAction>
                     </AlertDialogFooter>
                   </AlertDialogContent>

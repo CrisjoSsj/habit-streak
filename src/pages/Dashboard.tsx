@@ -5,6 +5,7 @@ import { es, enUS } from "date-fns/locale";
 import { Plus } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useLanguage } from "@/contexts/LanguageContext";
 import { useAuth } from "@/hooks/useAuth";
@@ -15,6 +16,7 @@ import { TimeFilter } from "@/components/habits/TimeFilter";
 import { HabitCard } from "@/components/habits/HabitCard";
 import { HabitFormDialog } from "@/components/habits/HabitFormDialog";
 import { CompletionModal } from "@/components/habits/CompletionModal";
+import { Onboarding } from "@/components/onboarding/Onboarding";
 import { getHabitIcon } from "@/lib/habitIcons";
 import { hexToRgba } from "@/lib/utils";
 import { getTodayForSupabase, isTodayInUserTimezone, parseDateFromSupabase, getTodayInUserTimezone } from "@/lib/date-utils";
@@ -40,8 +42,10 @@ const Dashboard = () => {
   const [showHabitForm, setShowHabitForm] = useState(false);
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null);
   const [showCompletionModal, setShowCompletionModal] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [checkingOnboarding, setCheckingOnboarding] = useState(true);
 
-  // Auth check
+  // Auth check and onboarding check
   useEffect(() => {
     const checkAuth = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -49,7 +53,20 @@ const Dashboard = () => {
         navigate("/auth", { replace: true });
         return;
       }
-      setUserId(session.user.id);
+      const userId = session.user.id;
+      setUserId(userId);
+
+      // Verificar si el usuario completó el onboarding
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed")
+        .eq("id", userId)
+        .single();
+
+      if (!profile?.onboarding_completed) {
+        setShowOnboarding(true);
+      }
+      setCheckingOnboarding(false);
       setLoading(false);
     };
     checkAuth();
@@ -320,83 +337,28 @@ const Dashboard = () => {
     setShowHabitForm(true);
   };
 
-  const handleDeleteHabit = async (habitId: string) => {
+  const handleArchiveHabit = async (habitId: string) => {
     if (!userId) return;
 
-    // Primero, obtener la información del hábito antes de eliminarlo
-    const habitToDelete = habits.find((h) => h.id === habitId);
-    
-    if (!habitToDelete) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "No se encontró el hábito",
-      });
-      return;
-    }
+    // Obtener la fecha de hoy para eliminar completions del día actual
+    const todayStr = getTodayForSupabase();
 
-    // Obtener la fecha de hoy para comparar
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const todayStr = format(today, "yyyy-MM-dd");
-
-    // Obtener todos los completions de este hábito
-    const { data: habitCompletions, error: fetchError } = await supabase
+    // Eliminar los completions del día actual cuando se archiva
+    const { error: deleteTodayError } = await supabase
       .from("habit_completions")
-      .select("*")
+      .delete()
       .eq("habit_id", habitId)
-      .eq("user_id", userId);
+      .eq("user_id", userId)
+      .eq("completion_date", todayStr);
 
-    if (fetchError) {
-      console.error("Error obteniendo completions:", fetchError);
+    if (deleteTodayError) {
+      console.error("Error eliminando completions de hoy:", deleteTodayError);
     }
 
-    if (habitCompletions && habitCompletions.length > 0) {
-      // Separar completions del día actual y de días anteriores
-      const todayCompletions = habitCompletions.filter(
-        (c) => c.completion_date === todayStr
-      );
-      const pastCompletions = habitCompletions.filter(
-        (c) => c.completion_date !== todayStr
-      );
-
-      // Eliminar los completions del día actual (no se guardan en el historial)
-      if (todayCompletions.length > 0) {
-        const { error: deleteTodayError } = await supabase
-          .from("habit_completions")
-          .delete()
-          .eq("habit_id", habitId)
-          .eq("user_id", userId)
-          .eq("completion_date", todayStr);
-
-        if (deleteTodayError) {
-          console.error("Error eliminando completions de hoy:", deleteTodayError);
-        }
-      }
-
-      // Actualizar solo los completions de días anteriores para guardar la información del hábito eliminado
-      if (pastCompletions.length > 0) {
-        const { error: updateError } = await supabase
-          .from("habit_completions")
-          .update({
-            deleted_habit_name: habitToDelete.name,
-            deleted_habit_icon: habitToDelete.icon,
-            deleted_habit_color: habitToDelete.color,
-          })
-          .eq("habit_id", habitId)
-          .eq("user_id", userId)
-          .neq("completion_date", todayStr); // Solo actualizar los que NO son de hoy
-
-        if (updateError) {
-          console.error("Error actualizando completions:", updateError);
-        }
-      }
-    }
-
-    // Ahora eliminar el hábito (los completions de días anteriores se mantendrán con habit_id = NULL)
+    // Archivar el hábito (marcar como archivado)
     const { error } = await supabase
       .from("habits")
-      .delete()
+      .update({ is_archived: true })
       .eq("id", habitId)
       .eq("user_id", userId);
 
@@ -404,32 +366,18 @@ const Dashboard = () => {
       toast({
         variant: "destructive",
         title: "Error",
-        description: error.message || "No se pudo eliminar el hábito",
+        description: error.message || "No se pudo archivar el hábito",
       });
       return;
     }
 
-    // Eliminar solo el hábito de los estados locales
+    // Eliminar el hábito de los estados locales (ya que solo mostramos activos)
     setHabits((prev) => prev.filter((h) => h.id !== habitId));
     
-    // Actualizar los completions locales:
-    // - Eliminar los del día actual
-    // - Actualizar los de días anteriores con la información del hábito eliminado
-    setCompletions((prev) => {
-      return prev
-        .filter((c) => !(c.habit_id === habitId && c.completion_date === todayStr)) // Eliminar del día actual
-        .map((c) =>
-          c.habit_id === habitId && c.completion_date !== todayStr
-            ? {
-                ...c,
-                habit_id: null,
-                deleted_habit_name: habitToDelete.name,
-                deleted_habit_icon: habitToDelete.icon,
-                deleted_habit_color: habitToDelete.color,
-              }
-            : c
-        );
-    });
+    // Eliminar completions del día actual del estado local
+    setCompletions((prev) => prev.filter(
+      (c) => !(c.habit_id === habitId && c.completion_date === todayStr)
+    ));
     
     // Limpiar timer state si existe
     setTimerStates((prev) => {
@@ -439,8 +387,8 @@ const Dashboard = () => {
     });
 
     toast({
-      title: t("habitDeleted"),
-      description: t("habitDeletedDesc"),
+      title: "Hábito archivado",
+      description: "El hábito se ha archivado y ya no aparecerá en tu lista activa. Puedes reactivarlo desde la sección de hábitos archivados.",
     });
   };
 
@@ -731,11 +679,25 @@ const Dashboard = () => {
   };
 
 
-  if (loading) {
+  if (loading || checkingOnboarding) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background">
         <p className="text-sm text-muted-foreground">{t("checkingSession")}</p>
       </div>
+    );
+  }
+
+  // Mostrar onboarding si es necesario
+  if (showOnboarding && userId) {
+    return (
+      <Onboarding
+        userId={userId}
+        onComplete={() => {
+          setShowOnboarding(false);
+          // Recargar hábitos después del onboarding
+          window.location.reload();
+        }}
+      />
     );
   }
 
@@ -767,141 +729,161 @@ const Dashboard = () => {
         </div>
 
         {/* Habit Lists by Time of Day */}
-        {filteredHabits.length === 0 && filteredCompletedHabits.length === 0 ? (
-          <div className="py-8 text-center">
-            <p className="text-muted-foreground">{t("noHabitsYet")}</p>
-            <Button
-              variant="outline"
-              className="mt-4"
-              onClick={() => setShowHabitForm(true)}
-            >
-              {t("createNewHabit")}
-            </Button>
-          </div>
-        ) : (
-          <>
-          <div className="space-y-6">
-            {/* Layout mejorado para pantallas horizontales */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {Object.entries(groupedHabits).map(([timeOfDay, habitList]) => {
-              if (habitList.length === 0) return null;
-              const label = timeOfDay === "anytime" ? t("anyMoment") : t(timeOfDay as any);
-              
-              return (
-                <div key={timeOfDay} className="space-y-3">
-                  <h2 className="text-xs font-semibold uppercase text-muted-foreground">
-                    {label}
-                  </h2>
-                  {habitList.map((habit) => {
-                    const completion = getCompletion(habit.id);
-                    const timerState = timerStates[habit.id] || { running: false, elapsed: 0 };
-                    const isTodayDate = isToday(selectedDate);
-                    const periodProgress = getPeriodProgress(habit);
-                    
-                    return (
-                      <HabitCard
-                        key={habit.id}
-                        id={habit.id}
-                        name={habit.name}
-                        icon={habit.icon || "smile"}
-                        color={habit.color || "#3B82F6"}
-                        habitType={habit.habit_type as "check" | "count" | "timer"}
-                        goalCount={habit.goal_count || 1}
-                        goalMinutes={habit.goal_minutes || 10}
-                        currentProgress={completion?.count_progress || 0}
-                        timerSeconds={timerState.elapsed || completion?.timer_seconds || 0}
-                        isTimerRunning={timerState.running}
-                        isCompleted={completion?.is_completed || false}
-                        onToggleComplete={() => handleToggleComplete(habit)}
-                        onAddProgress={(amount) => handleAddProgress(habit, amount)}
-                        onToggleTimer={() => handleToggleTimer(habit.id)}
-                        onResetTimer={() => handleResetTimer(habit.id)}
-                        onRestDay={() => handleRestDay(habit.id)}
-                        onEdit={() => handleEditHabit(habit)}
-                        onDelete={() => handleDeleteHabit(habit.id)}
-                        isToday={isTodayDate}
-                        periodProgress={periodProgress}
-                      />
-                    );
-                  })}
-                </div>
-              );
-            })}
-          </div>
+        {/* Calcular hábitos eliminados primero para verificar si hay alguno */}
+        {(() => {
+          const selectedDateStr = format(selectedDate, "yyyy-MM-dd");
+          const deletedHabitsCompletions = completions.filter(c => {
+            const completionWithDeleted = c as HabitCompletion & {
+              deleted_habit_name?: string | null;
+              deleted_habit_icon?: string | null;
+              deleted_habit_color?: string | null;
+            };
+            return !c.habit_id 
+              && completionWithDeleted.deleted_habit_name 
+              && c.completion_date === selectedDateStr
+              && c.is_completed;
+          });
 
-        {/* Create new habit button at bottom */}
-        {habits.length > 0 && (
-          <Button
-            variant="secondary"
-            className="w-full"
-            onClick={() => {
-              setEditingHabit(null);
-              setShowHabitForm(true);
-            }}
-          >
-            {t("createNewHabit")}
-          </Button>
-        )}
-          </div>
-          
-          {/* Sección de hábitos completados del período */}
-          {filteredCompletedHabits.length > 0 && (
-            <div className="space-y-6 mt-8 pt-6 border-t">
-              <div className="flex items-center gap-2">
-                <div className="h-1 w-8 rounded-full bg-green-500" />
-                <h2 className="text-sm font-semibold text-muted-foreground uppercase">
-                  {t("periodCompleted")}
-                </h2>
-              </div>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {Object.entries(groupedCompletedHabits).map(([timeOfDay, habitList]) => {
-                  if (habitList.length === 0) return null;
-                  const label = timeOfDay === "anytime" ? t("anyMoment") : t(timeOfDay as any);
-                  
-                  return (
-                    <div key={timeOfDay} className="space-y-3">
-                      <h3 className="text-xs font-semibold uppercase text-muted-foreground">
-                        {label}
-                      </h3>
-                      {habitList.map((habit) => {
-                        const periodProgress = getPeriodProgress(habit);
+          const hasDeletedHabits = deletedHabitsCompletions.length > 0;
+          const hasActiveHabits = filteredHabits.length > 0 || filteredCompletedHabits.length > 0;
+
+          return (
+            <>
+              {!hasActiveHabits && !hasDeletedHabits ? (
+                <div className="py-8 text-center">
+                  <p className="text-muted-foreground">{t("noHabitsYet")}</p>
+                  <Button
+                    variant="outline"
+                    className="mt-4"
+                    onClick={() => setShowHabitForm(true)}
+                  >
+                    {t("createNewHabit")}
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="space-y-6">
+                    {/* Layout mejorado para pantallas horizontales */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                      {Object.entries(groupedHabits).map(([timeOfDay, habitList]) => {
+                        if (habitList.length === 0) return null;
+                        const label = timeOfDay === "anytime" ? t("anyMoment") : t(timeOfDay as any);
                         
                         return (
-                          <div
-                            key={habit.id}
-                            className="rounded-xl p-4 border border-green-200 dark:border-green-800 opacity-75"
-                            style={{ backgroundColor: hexToRgba(habit.color || "#3B82F6", 0.2) }}
-                          >
-                            <div className="flex items-center gap-3">
-                              <div 
-                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
-                                style={{ backgroundColor: habit.color || "#3B82F6" }}
-                              >
-                                {(() => {
-                                  const IconComponent = getHabitIcon(habit.icon);
-                                  return <IconComponent className="h-5 w-5" />;
-                                })()}
-                              </div>
-                              <div className="flex-1 min-w-0">
-                                <h3 className="font-semibold text-foreground truncate">{habit.name}</h3>
-                                {periodProgress && (
-                                  <p className="text-sm text-muted-foreground">
-                                    {periodProgress.current} / {periodProgress.goal} {periodProgress.periodLabel} ✓
-                                  </p>
-                                )}
-                              </div>
-                            </div>
+                          <div key={timeOfDay} className="space-y-3">
+                            <h2 className="text-xs font-semibold uppercase text-muted-foreground">
+                              {label}
+                            </h2>
+                            {habitList.map((habit) => {
+                              const completion = getCompletion(habit.id);
+                              const timerState = timerStates[habit.id] || { running: false, elapsed: 0 };
+                              const isTodayDate = isToday(selectedDate);
+                              const periodProgress = getPeriodProgress(habit);
+                              
+                              return (
+                                <HabitCard
+                                  key={habit.id}
+                                  id={habit.id}
+                                  name={habit.name}
+                                  icon={habit.icon || "smile"}
+                                  color={habit.color || "#3B82F6"}
+                                  habitType={habit.habit_type as "check" | "count" | "timer"}
+                                  goalCount={habit.goal_count || 1}
+                                  goalMinutes={habit.goal_minutes || 10}
+                                  currentProgress={completion?.count_progress || 0}
+                                  timerSeconds={timerState.elapsed || completion?.timer_seconds || 0}
+                                  isTimerRunning={timerState.running}
+                                  isCompleted={completion?.is_completed || false}
+                                  onToggleComplete={() => handleToggleComplete(habit)}
+                                  onAddProgress={(amount) => handleAddProgress(habit, amount)}
+                                  onToggleTimer={() => handleToggleTimer(habit.id)}
+                                  onResetTimer={() => handleResetTimer(habit.id)}
+                                  onRestDay={() => handleRestDay(habit.id)}
+                                  onEdit={() => handleEditHabit(habit)}
+                                  onArchive={() => handleArchiveHabit(habit.id)}
+                                  isToday={isTodayDate}
+                                  periodProgress={periodProgress}
+                                />
+                              );
+                            })}
                           </div>
                         );
                       })}
                     </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-          </>
-        )}
+
+                    {/* Create new habit button at bottom */}
+                    {habits.length > 0 && (
+                      <Button
+                        variant="secondary"
+                        className="w-full"
+                        onClick={() => {
+                          setEditingHabit(null);
+                          setShowHabitForm(true);
+                        }}
+                      >
+                        {t("createNewHabit")}
+                      </Button>
+                    )}
+                  </div>
+                  
+                  {/* Sección de hábitos completados del período */}
+                  {filteredCompletedHabits.length > 0 && (
+                    <div className="space-y-6 mt-8 pt-6 border-t">
+                      <div className="flex items-center gap-2">
+                        <div className="h-1 w-8 rounded-full bg-green-500" />
+                        <h2 className="text-sm font-semibold text-muted-foreground uppercase">
+                          {t("periodCompleted")}
+                        </h2>
+                      </div>
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {Object.entries(groupedCompletedHabits).map(([timeOfDay, habitList]) => {
+                          if (habitList.length === 0) return null;
+                          const label = timeOfDay === "anytime" ? t("anyMoment") : t(timeOfDay as any);
+                          
+                          return (
+                            <div key={timeOfDay} className="space-y-3">
+                              <h3 className="text-xs font-semibold uppercase text-muted-foreground">
+                                {label}
+                              </h3>
+                              {habitList.map((habit) => {
+                                const periodProgress = getPeriodProgress(habit);
+                                
+                                return (
+                                  <div
+                                    key={habit.id}
+                                    className="rounded-xl p-4 border border-green-200 dark:border-green-800 opacity-75"
+                                    style={{ backgroundColor: hexToRgba(habit.color || "#3B82F6", 0.2) }}
+                                  >
+                                    <div className="flex items-center gap-3">
+                                      <div 
+                                        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-white"
+                                        style={{ backgroundColor: habit.color || "#3B82F6" }}
+                                      >
+                                        {(() => {
+                                          const IconComponent = getHabitIcon(habit.icon);
+                                          return <IconComponent className="h-5 w-5" />;
+                                        })()}
+                                      </div>
+                                      <div className="flex-1 min-w-0">
+                                        <h3 className="font-semibold text-foreground truncate">{habit.name}</h3>
+                                        {periodProgress && (
+                                          <p className="text-sm text-muted-foreground">
+                                            {periodProgress.current} / {periodProgress.goal} {periodProgress.periodLabel} ✓
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
+              )}
       </main>
 
       <BottomNav />

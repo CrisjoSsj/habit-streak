@@ -2,7 +2,7 @@
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,23 @@ const ForgotPasswordSchema = z.object({
     .email({ message: "Correo electrónico no válido" })
     .max(255, { message: "El correo es demasiado largo" })
     .toLowerCase(),
+});
+
+const ResetPasswordSchema = z.object({
+  password: z
+    .string()
+    .nonempty({ message: "La contraseña es obligatoria" })
+    .min(8, { message: "La contraseña debe tener al menos 8 caracteres" })
+    .max(72, { message: "La contraseña es demasiado larga" })
+    .regex(/[A-Z]/, { message: "Debe contener al menos una mayúscula" })
+    .regex(/[a-z]/, { message: "Debe contener al menos una minúscula" })
+    .regex(/[0-9]/, { message: "Debe contener al menos un número" }),
+  confirmPassword: z
+    .string()
+    .nonempty({ message: "Por favor confirma tu contraseña" }),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Las contraseñas no coinciden",
+  path: ["confirmPassword"],
 });
 
 const RegisterSchema = z.object({
@@ -120,11 +137,14 @@ const RegisterSchema = z.object({
 type LoginValues = z.infer<typeof LoginSchema>;
 type RegisterValues = z.infer<typeof RegisterSchema>;
 type ForgotPasswordValues = z.infer<typeof ForgotPasswordSchema>;
+type ResetPasswordValues = z.infer<typeof ResetPasswordSchema>;
 
-type AuthMode = "login" | "register" | "forgot";
+type AuthMode = "login" | "register" | "forgot" | "resetPassword";
 
 const Auth = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams] = useSearchParams();
   const { t } = useLanguage();
   const [mode, setMode] = useState<AuthMode>("login");
   const [loading, setLoading] = useState(false);
@@ -132,7 +152,10 @@ const Auth = () => {
   const [infoMessage, setInfoMessage] = useState<string | null>(null);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [showResetConfirmPassword, setShowResetConfirmPassword] = useState(false);
   const [passwordStrength, setPasswordStrength] = useState(0);
+  const [resetPasswordStrength, setResetPasswordStrength] = useState(0);
   const [resendEmail, setResendEmail] = useState<string | null>(null);
 
   const loginForm = useForm<LoginValues>({
@@ -145,6 +168,10 @@ const Auth = () => {
 
   const forgotPasswordForm = useForm<ForgotPasswordValues>({
     resolver: zodResolver(ForgotPasswordSchema),
+  });
+
+  const resetPasswordForm = useForm<ResetPasswordValues>({
+    resolver: zodResolver(ResetPasswordSchema),
   });
 
   // Calcular fortaleza de contraseña
@@ -171,15 +198,68 @@ const Auth = () => {
     return "Fuerte";
   };
 
+  // Detectar si hay un token de reset de contraseña en el hash
   useEffect(() => {
+    const hash = location.hash;
+    const urlMode = searchParams.get('mode');
+    
+    // Verificar si hay un hash con access_token (token de Supabase)
+    if (hash && hash.includes('access_token')) {
+      // Parsear el hash para verificar el tipo
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const type = hashParams.get('type');
+      
+      if (type === 'recovery') {
+        // Es un token de recovery, esperar un momento para que Supabase lo procese
+        setTimeout(() => {
+          supabase.auth.getSession().then(({ data: { session } }) => {
+            if (session) {
+              // Token válido, mostrar formulario de reset
+              setMode("resetPassword");
+              setInfoMessage("Ingresa tu nueva contraseña para completar el restablecimiento.");
+              // Limpiar el hash de la URL para que no se procese de nuevo
+              window.history.replaceState(null, '', window.location.pathname + window.location.search);
+            } else {
+              setErrorMessage("El enlace de restablecimiento no es válido o ha expirado. Por favor, solicita uno nuevo.");
+              setMode("forgot");
+            }
+          });
+        }, 100);
+        return; // Salir temprano para no ejecutar el resto del useEffect
+      }
+    }
+    
+    // Si viene con mode=reset pero sin hash, verificar si hay una sesión válida de recovery
+    if (urlMode === 'reset') {
+      supabase.auth.getSession().then(({ data: { session } }) => {
+        if (session) {
+          // Ya hay sesión, mostrar formulario de reset
+          setMode("resetPassword");
+          setInfoMessage("Ingresa tu nueva contraseña para completar el restablecimiento.");
+        } else {
+          // Sin sesión ni hash, mostrar error
+          setMode("forgot");
+          setErrorMessage("El enlace de restablecimiento no es válido. Por favor, solicita uno nuevo.");
+        }
+      });
+      return; // Salir temprano
+    }
+    
+    // Si no hay hash ni mode=reset, comportamiento normal
     document.title = "Acceso a HabitTrack · Sistema de Gestión de Hábitos";
 
+    // Solo verificar sesión y redirigir si no estamos en modo resetPassword
+    if (mode !== "resetPassword") {
     supabase.auth.getSession().then(({ data }) => {
-      if (data.session) {
+        if (data.session && mode !== "resetPassword") {
+          // No redirigir si hay un hash de recovery pendiente
+          if (!hash || !hash.includes('type=recovery')) {
         checkRoleAndRedirect(data.session.user.id);
+          }
       }
     });
-  }, [navigate]);
+    }
+  }, [location.hash, searchParams, mode, navigate]);
 
   const checkRoleAndRedirect = async (userId: string) => {
     const { data } = await supabase
@@ -548,6 +628,62 @@ const Auth = () => {
     }
   };
 
+  const onResetPasswordSubmit = async (values: ResetPasswordValues) => {
+    setErrorMessage(null);
+    setInfoMessage(null);
+    setLoading(true);
+
+    try {
+      // Verificar que hay una sesión válida (el token del hash ya debería haber creado la sesión)
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError || !session) {
+        setErrorMessage("El enlace de restablecimiento no es válido o ha expirado. Por favor, solicita uno nuevo.");
+        setMode("forgot");
+        setLoading(false);
+        return;
+      }
+
+      // Actualizar la contraseña
+      const { error } = await supabase.auth.updateUser({
+        password: values.password,
+      });
+
+      if (error) {
+        let errorMsg = error.message;
+        if (error.message.includes("Password should be at least")) {
+          errorMsg = "La contraseña debe cumplir con los requisitos de seguridad.";
+        } else if (error.message.includes("New password should be different")) {
+          errorMsg = "La nueva contraseña debe ser diferente a la anterior.";
+        } else if (error.message.includes("expired") || error.message.includes("invalid")) {
+          errorMsg = "El enlace de restablecimiento ha expirado. Por favor, solicita uno nuevo.";
+          setMode("forgot");
+        }
+        setErrorMessage(errorMsg);
+        setLoading(false);
+        return;
+      }
+
+      // Contraseña actualizada exitosamente
+      setInfoMessage("¡Contraseña restablecida exitosamente! Redirigiendo...");
+      
+      // Esperar un momento y redirigir al login
+      setTimeout(() => {
+        // Cerrar sesión para que el usuario inicie sesión con la nueva contraseña
+        supabase.auth.signOut().then(() => {
+          setMode("login");
+          resetPasswordForm.reset();
+          setInfoMessage("Contraseña restablecida. Por favor, inicia sesión con tu nueva contraseña.");
+        });
+      }, 2000);
+    } catch (error: any) {
+      console.error("Reset password error:", error);
+      setErrorMessage("Ocurrió un error al restablecer la contraseña. Por favor, intenta nuevamente.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-b from-background via-background to-accent/10">
@@ -576,7 +712,110 @@ const Auth = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            {mode === "forgot" ? (
+            {mode === "resetPassword" ? (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <h3 className="text-lg font-semibold">Restablecer contraseña</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Ingresa tu nueva contraseña para completar el restablecimiento.
+                  </p>
+                </div>
+                <form className="space-y-4" onSubmit={resetPasswordForm.handleSubmit(onResetPasswordSubmit)} noValidate>
+                  <div className="space-y-1">
+                    <Label htmlFor="reset-password">Nueva contraseña</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input 
+                        id="reset-password" 
+                        type={showResetPassword ? "text" : "password"} 
+                        autoComplete="new-password" 
+                        className="pl-9 pr-9"
+                        placeholder="Ingresa tu nueva contraseña"
+                        {...resetPasswordForm.register("password", {
+                          onChange: (e) => {
+                            const strength = calculatePasswordStrength(e.target.value);
+                            setResetPasswordStrength(strength);
+                          },
+                        })} 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetPassword(!showResetPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showResetPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {resetPasswordForm.watch("password") && (
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground">Fortaleza:</span>
+                          <span className={`font-medium ${
+                            resetPasswordStrength < 40 ? "text-red-500" : 
+                            resetPasswordStrength < 70 ? "text-yellow-500" : 
+                            "text-green-500"
+                          }`}>
+                            {getPasswordStrengthText(resetPasswordStrength)}
+                          </span>
+                        </div>
+                        <Progress value={resetPasswordStrength} className="h-1.5" />
+                      </div>
+                    )}
+                    {resetPasswordForm.formState.errors.password && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <XCircle className="h-3 w-3" />
+                        {resetPasswordForm.formState.errors.password.message}
+                      </p>
+                    )}
+                  </div>
+                  <div className="space-y-1">
+                    <Label htmlFor="reset-confirmPassword">Confirmar nueva contraseña</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input 
+                        id="reset-confirmPassword" 
+                        type={showResetConfirmPassword ? "text" : "password"} 
+                        autoComplete="new-password" 
+                        className="pl-9 pr-9"
+                        placeholder="Confirma tu nueva contraseña"
+                        {...resetPasswordForm.register("confirmPassword")} 
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowResetConfirmPassword(!showResetConfirmPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        {showResetConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                    {resetPasswordForm.formState.errors.confirmPassword && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <XCircle className="h-3 w-3" />
+                        {resetPasswordForm.formState.errors.confirmPassword.message}
+                      </p>
+                    )}
+                  </div>
+
+                  {errorMessage && (
+                    <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertDescription className="text-xs">{errorMessage}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  {infoMessage && (
+                    <Alert>
+                      <CheckCircle2 className="h-4 w-4" />
+                      <AlertDescription className="text-xs">{infoMessage}</AlertDescription>
+                    </Alert>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={loading}>
+                    {loading ? "Restableciendo..." : "Restablecer contraseña"}
+                  </Button>
+                </form>
+              </div>
+            ) : mode === "forgot" ? (
               <Tabs value="forgot" className="space-y-4">
                 <TabsContent value="forgot" className="space-y-4">
                   <div className="space-y-4">

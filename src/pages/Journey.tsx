@@ -1,7 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { format, subDays, startOfWeek, eachDayOfInterval } from "date-fns";
+import { format, subDays, startOfWeek, eachDayOfInterval, parseISO } from "date-fns";
 import { es, enUS } from "date-fns/locale";
+import { getTodayInUserTimezone, getTodayForSupabase } from "@/lib/date-utils";
 import { Trophy, Flame, Target, TrendingUp, Calendar as CalendarIcon, Award, Star, Zap, Gem, CheckCircle2, Sparkles } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -87,21 +88,74 @@ const Journey = () => {
       };
     }
 
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = getTodayInUserTimezone();
+    const todayStr = getTodayForSupabase();
+    
+    // Obtener hábitos activos una sola vez
+    const activeHabits = habits.filter(h => !h.is_archived);
+    if (activeHabits.length === 0) {
+      return {
+        totalDays: 0,
+        currentStreak: 0,
+        bestStreak: 0,
+        totalCompletions: 0,
+        completionRate: 0,
+        achievementsUnlocked: achievements.length,
+      };
+    }
+    
+    // Verificar si hoy está completo
+    const todayCompletions = completions.filter(
+      c => c.completion_date === todayStr && c.is_completed
+    );
+    const completedActiveHabitsToday = new Set(todayCompletions.filter(c => c.habit_id !== null).map(c => c.habit_id)).size;
+    const isTodayComplete = completedActiveHabitsToday >= activeHabits.length;
     
     // Calcular racha actual
+    // Si hoy está completo, empezar desde hoy, si no, desde ayer
     let currentStreak = 0;
-    for (let i = 0; i < 365; i++) {
+    const startOffset = isTodayComplete ? 0 : 1;
+    
+    for (let i = startOffset; i < 365; i++) {
       const checkDate = subDays(today, i);
       const dateStr = format(checkDate, "yyyy-MM-dd");
-      const activeHabits = habits.filter(h => !h.is_archived);
+      
+      // Verificar si todos los hábitos activos fueron completados ese día
+      // Incluir tanto hábitos activos como eliminados
       const dayCompletions = completions.filter(
         c => c.completion_date === dateStr && c.is_completed
       );
-      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
       
-      if (completedHabitsCount >= activeHabits.length && activeHabits.length > 0) {
+      // Obtener los hábitos activos que existían en esa fecha
+      const habitsActiveOnDate = activeHabits.filter(h => {
+        if (!h.created_at) return true;
+        const habitCreatedDate = parseISO(h.created_at);
+        habitCreatedDate.setHours(0, 0, 0, 0);
+        const checkDateOnly = parseISO(dateStr);
+        checkDateOnly.setHours(0, 0, 0, 0);
+        return checkDateOnly >= habitCreatedDate;
+      });
+      
+      // Obtener hábitos eliminados que fueron completados en esa fecha
+      const deletedHabitsOnDate = new Set<string>();
+      dayCompletions.forEach(c => {
+        if (!c.habit_id && (c as any).deleted_habit_name) {
+          deletedHabitsOnDate.add((c as any).deleted_habit_name);
+        }
+      });
+      
+      // Total de hábitos que existían en esa fecha (activos + eliminados completados ese día)
+      const totalHabitsOnDate = habitsActiveOnDate.length + deletedHabitsOnDate.size;
+      
+      if (totalHabitsOnDate === 0) break;
+      
+      // Contar completaciones: hábitos activos completados + hábitos eliminados completados
+      const completedActiveHabits = new Set(dayCompletions.filter(c => c.habit_id !== null).map(c => c.habit_id)).size;
+      const completedDeletedHabits = deletedHabitsOnDate.size;
+      const completedHabitsCount = completedActiveHabits + completedDeletedHabits;
+      
+      // Verificar que todos los hábitos que existían en esa fecha fueron completados
+      if (completedHabitsCount >= totalHabitsOnDate) {
         currentStreak++;
       } else {
         break;
@@ -111,16 +165,57 @@ const Journey = () => {
     // Calcular mejor racha
     let bestStreak = 0;
     let tempStreak = 0;
-    const sortedDates = [...new Set(completions.map(c => c.completion_date))].sort().reverse();
+    
+    // Obtener todas las fechas únicas desde la fecha más antigua hasta hoy
+    const allDates = new Set<string>();
+    const todayDate = parseISO(todayStr);
+    
+    // Agregar todas las fechas desde hoy hasta 365 días atrás
+    for (let i = 0; i < 365; i++) {
+      const date = subDays(todayDate, i);
+      allDates.add(format(date, "yyyy-MM-dd"));
+    }
+    
+    // Ordenar fechas de más reciente a más antigua
+    const sortedDates = Array.from(allDates).sort().reverse();
     
     for (const dateStr of sortedDates) {
-      const activeHabits = habits.filter(h => !h.is_archived);
       const dayCompletions = completions.filter(
         c => c.completion_date === dateStr && c.is_completed
       );
-      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
       
-      if (completedHabitsCount >= activeHabits.length && activeHabits.length > 0) {
+      // Obtener los hábitos activos que existían en esa fecha
+      const habitsActiveOnDate = activeHabits.filter(h => {
+        if (!h.created_at) return true;
+        const habitCreatedDate = parseISO(h.created_at);
+        habitCreatedDate.setHours(0, 0, 0, 0);
+        const checkDateOnly = parseISO(dateStr);
+        checkDateOnly.setHours(0, 0, 0, 0);
+        return checkDateOnly >= habitCreatedDate;
+      });
+      
+      // Obtener hábitos eliminados que fueron completados en esa fecha
+      const deletedHabitsOnDate = new Set<string>();
+      dayCompletions.forEach(c => {
+        if (!c.habit_id && (c as any).deleted_habit_name) {
+          deletedHabitsOnDate.add((c as any).deleted_habit_name);
+        }
+      });
+      
+      // Total de hábitos que existían en esa fecha
+      const totalHabitsOnDate = habitsActiveOnDate.length + deletedHabitsOnDate.size;
+      
+      if (totalHabitsOnDate === 0) {
+        tempStreak = 0;
+        continue;
+      }
+      
+      // Contar completaciones: hábitos activos + eliminados
+      const completedActiveHabits = new Set(dayCompletions.filter(c => c.habit_id !== null).map(c => c.habit_id)).size;
+      const completedDeletedHabits = deletedHabitsOnDate.size;
+      const completedHabitsCount = completedActiveHabits + completedDeletedHabits;
+      
+      if (completedHabitsCount >= totalHabitsOnDate) {
         tempStreak++;
         bestStreak = Math.max(bestStreak, tempStreak);
       } else {
@@ -131,13 +226,12 @@ const Journey = () => {
     // Días totales activos
     const uniqueDays = new Set(completions.map(c => c.completion_date)).size;
     
-    // Tasa de completación (últimos 30 días)
+    // Tasa de completación (últimos 30 días) - incluyendo hábitos eliminados
     const thirtyDaysAgo = subDays(today, 30);
+    const thirtyDaysAgoStr = format(thirtyDaysAgo, "yyyy-MM-dd");
     const recentCompletions = completions.filter(c => {
-      const completionDate = new Date(c.completion_date);
-      return completionDate >= thirtyDaysAgo && c.is_completed;
+      return c.completion_date >= thirtyDaysAgoStr && c.is_completed;
     });
-    const activeHabits = habits.filter(h => !h.is_archived);
     const totalPossible = activeHabits.length * 30;
     const completionRate = totalPossible > 0 
       ? Math.round((recentCompletions.length / totalPossible) * 100) 
@@ -177,16 +271,29 @@ const Journey = () => {
       const dateStr = format(day, "yyyy-MM-dd");
       const activeHabits = habits.filter(h => !h.is_archived);
       const dayCompletions = completions.filter(
-        c => c.completion_date === dateStr && c.is_completed && c.habit_id !== null
+        c => c.completion_date === dateStr && c.is_completed
       );
-      const completedHabitsCount = new Set(dayCompletions.map(c => c.habit_id)).size;
-      const isComplete = activeHabits.length > 0 && completedHabitsCount >= activeHabits.length;
+      // Contar hábitos activos completados
+      const completedActiveHabits = new Set(
+        dayCompletions.filter(c => c.habit_id !== null).map(c => c.habit_id)
+      ).size;
+      // Contar hábitos eliminados completados ese día
+      const deletedHabitsOnDate = new Set(
+        dayCompletions
+          .filter(c => !c.habit_id && (c as any).deleted_habit_name)
+          .map(c => (c as any).deleted_habit_name)
+      );
+      const completedHabitsCount = completedActiveHabits + deletedHabitsOnDate.size;
+      
+      // Para determinar si está completo, considerar hábitos activos actuales + eliminados completados ese día
+      const totalHabitsOnDate = activeHabits.length + deletedHabitsOnDate.size;
+      const isComplete = totalHabitsOnDate > 0 && completedHabitsCount >= totalHabitsOnDate;
       
       return {
         date: day,
         dateStr,
         completed: completedHabitsCount,
-        total: activeHabits.length,
+        total: totalHabitsOnDate || activeHabits.length,
         isComplete,
         dayOfWeek: format(day, "EEE", { locale }),
       };
@@ -392,74 +499,6 @@ const Journey = () => {
                 )}
               </CardContent>
             </Card>
-
-            {/* Logros recientes */}
-            {achievements.length > 0 && (
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="h-5 w-5" />
-                    Logros Recientes
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 gap-3">
-                    {achievements.slice(0, 2).map((achievement) => {
-                      const achievementTypes: Record<string, { label: string; Icon: any }> = {
-                        first_completion: { 
-                          label: "Primera completación", 
-                          Icon: Target
-                        },
-                        streak_3_days: { 
-                          label: "Racha de 3 días", 
-                          Icon: Flame
-                        },
-                        streak_7_days: { 
-                          label: "Racha de 7 días", 
-                          Icon: Zap
-                        },
-                        streak_30_days: { 
-                          label: "Racha de 30 días", 
-                          Icon: Gem
-                        },
-                        perfect_day: { 
-                          label: "Día perfecto", 
-                          Icon: Star
-                        },
-                        perfect_week: { 
-                          label: "Semana perfecta", 
-                          Icon: Sparkles
-                        },
-                      };
-                      
-                      const info = achievementTypes[achievement.achievement_type] || {
-                        label: achievement.achievement_type,
-                        Icon: Trophy
-                      };
-                      
-                      const AchievementIcon = info.Icon;
-                      
-                      return (
-                        <div
-                          key={achievement.id}
-                          className="flex items-center gap-3 p-4 rounded-xl border bg-card hover:bg-accent/50 transition-colors"
-                        >
-                          <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                            <AchievementIcon className="h-6 w-6" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-sm">{info.label}</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">
-                              {format(new Date(achievement.unlocked_at), "d 'de' MMMM, yyyy", { locale })}
-                            </p>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
 
             {/* Resumen de estadísticas */}
             <Card>
