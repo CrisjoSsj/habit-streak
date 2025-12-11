@@ -884,6 +884,9 @@ const Dashboard = () => {
                   )}
                 </>
               )}
+            </>
+          );
+        })()}
       </main>
 
       <BottomNav />
